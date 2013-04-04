@@ -76,7 +76,7 @@ class TestCsvMadness < Test::Unit::TestCase
           (id.to_i * 2).to_s
         end
         
-        assert_equal %W(2 4 6), @simple.column(:id)
+        assert_equal %W(2 4 6 8), @simple.column(:id)
       end
       
       should "set ID column to integers" do
