@@ -113,16 +113,18 @@ module CsvMadness
       @records[offset]
     end
   
-    # should be all objects.  index column should yield unique value for each object.
+    # Fetches an indexed record based on the column indexed and the keying object.
+    # If key is an array of keying objects, returns an array of records in the
+    # same order that the keying objects appear.
+    # Index column should yield a different, unique value for each record.
     def fetch( index_col, key )
-      @indexes[index_col][key]
+      if key.is_a?(Array)
+        keys.map{ |key| @indexes[index_col][key] }
+      else
+        @indexes[index_col][key]
+      end
     end
-  
-    # takes an array of keys
-    def fetch_many( index_col, keys )
-      keys.map{ |key| @indexes[index_col][key] }
-    end
-  
+    
     # function should take an object, and return either true or false
     # returns an array of objects that respond true when put through the
     # meat grinder
@@ -145,6 +147,14 @@ module CsvMadness
     def column col
       @records.map(&col)
     end
+    
+    def multiple_columns(*args)
+      @records.inject([]){ |collector, record|
+        collector << args.map{ |arg| record.send(arg) }
+        collector
+      }
+    end
+    
 
     def alter_cells( &block )
       @records.each do |record|
