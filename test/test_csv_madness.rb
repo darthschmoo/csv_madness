@@ -84,7 +84,7 @@ class TestCsvMadness < Test::Unit::TestCase
         
         @simple.records.each do |record|
           assert_kind_of Integer, record.id
-          assert_includes [1,2,3], record.id
+          assert_includes [1,2,3,4], record.id
         end
       end
       
@@ -117,6 +117,13 @@ class TestCsvMadness < Test::Unit::TestCase
         assert @simple[0].respond_to?( :name_last_first )
         assert_equal "Moore, Mary", @simple[0].name_last_first
         
+      end
+      
+      should "return an array of objects when feeding fetch() an array" do
+        records = @simple.fetch(:id, ["1","2"])
+        assert_equal records.length, records.compact.length
+        assert_equal 2, records.length
+        assert_equal "1", records.first.id
       end
     end
   end
