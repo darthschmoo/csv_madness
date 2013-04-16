@@ -119,7 +119,7 @@ module CsvMadness
     # Index column should yield a different, unique value for each record.
     def fetch( index_col, key )
       if key.is_a?(Array)
-        keys.map{ |key| @indexes[index_col][key] }
+        key.map{ |key| @indexes[index_col][key] }
       else
         @indexes[index_col][key]
       end
