@@ -13,7 +13,7 @@ module CsvMadness
     end
     
     def [] key
-      @csv_data[key]
+      @csv_data[key] 
     end
     
     def []= key, val
@@ -30,6 +30,10 @@ module CsvMadness
     
     def self.spreadsheet
       @spreadsheet
+    end
+    
+    def to_csv( opts = {} )
+      self.columns.map{|col| self.send(col) }.to_csv( opts )
     end
   end
 end

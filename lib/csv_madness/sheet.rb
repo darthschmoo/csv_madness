@@ -67,8 +67,30 @@ module CsvMadness
       nil
     end
     
+    # opts are passed to underlying CSV (:row_sep, :encoding, :force_quotes)
+    def self.to_csv( spreadsheet, opts = {} )
+      out = spreadsheet.columns.to_csv( opts )
+      spreadsheet.records.inject( out ) do |output, record|
+        output << record.to_csv( opts )
+      end
+    end
     
+    def self.write_to_file( spreadsheet, file, opts )
+      File.open( file, "w" ) do |f|
+        f << spreadsheet.to_csv( opts )
+      end
+    end
+    
+    def write_to_file( file, opts = {} )
+      self.class.write_to_file( self, file, opts )
+    end
 
+    def to_csv( opts = {} )
+      self.records.inject( self.columns.to_csv( opts ) ) do |output, record|
+        output << record.to_csv( opts )
+      end
+    end
+    
     attr_reader :columns, :records, :spreadsheet_file, :record_class
     # opts: 
     #   index: ( [:id, :id2 ] )
@@ -176,18 +198,20 @@ module CsvMadness
     def set_column_type( column, type )
       alter_column( column, &COLUMN_TYPES[type] )
     end
+
+    # Note: If a block is given, the mod arg will be ignored.
+    def add_record_methods( mod = nil, &block )
+      if block_given?
+        mod = Module.new( &block )
+      end
+      @record_class.send( :include, mod )
+      self
+    end
     
-    # TODO: BLOCK FORM DOES NOT WORK!
-    def decorate_records_with_module( m = nil, &block )
-      if m.is_a?(Module) 
-        @record_class.send(:include, m)
-      elsif block_given?
-        raise "DOES NOT WORK"
-        m = Module.new do
-          yield
-        end
-        
-        @record_class.send(:include, m)
+    # Note: If implementation of Record[] changes, so must this.
+    def nils_are_blank_strings
+      alter_cells do |value, record|
+        value.nil? ? "" : value
       end
     end
     
@@ -296,7 +320,7 @@ module CsvMadness
             def #{column}
               self.csv_data[#{i}]
             end
-          
+            
             def #{column}=( val )
               self.csv_data[#{i}] = val
             end
