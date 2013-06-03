@@ -25,7 +25,7 @@ Jeweler::Tasks.new do |gem|
   gem.email = "keeputahweird@gmail.com"
   gem.authors = ["Bryce Anderson"]
   # dependencies defined in Gemfile
-  gem.files = [ "./lib/csv_madness/csv_recipe.rb", 
+  gem.files = [ "./lib/csv_madness/data_accessor_module.rb", 
                 "./lib/csv_madness/record.rb", 
                 "./lib/csv_madness/sheet.rb", 
                 "./lib/csv_madness.rb", 
