@@ -3,6 +3,7 @@ require 'pathname'
 require 'time'        # to use Time.parse to parse cells to get the date
 require 'debugger'
 
+require_relative 'csv_madness/data_accessor_module'
 require_relative 'csv_madness/sheet'
 require_relative 'csv_madness/record'
 

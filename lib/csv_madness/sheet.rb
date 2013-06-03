@@ -27,6 +27,7 @@ module CsvMadness
       end
     }
     
+    # Used to make getter/setter names out of the original header strings.
     # " hello;: world! " => :hello_world
     def self.getter_name( name )
       name = name.strip.gsub(/\s+/,"_").gsub(/(\W|_)+/, "" ).downcase
@@ -37,6 +38,8 @@ module CsvMadness
       name.to_sym
     end
     
+    
+    # Paths to be searched when CsvMadness.load( "filename.csv" ) is called.
     def self.add_search_path( path )
       @search_paths ||= []
       path = Pathname.new( path ).expand_path
@@ -51,15 +54,19 @@ module CsvMadness
       end
     end
     
+    # Search absolute/relative-to-current-dir before checking
+    # search paths.
     def self.find_spreadsheet_in_filesystem( name )
-      path = Pathname.new( name )
-      if path.absolute? && path.exist?
-        return path
+      @search_paths ||= []
+
+      expanded_path = Pathname.new( name ).expand_path
+      if expanded_path.exist?
+        return expanded_path
       else   # look for it in the search paths
         @search_paths.each do |p|
-          file = p.join( path )
+          file = p.join( name )
           if file.exist? && file.file?
-            return p.join( path )
+            return p.join( name )
           end
         end
       end
@@ -75,7 +82,8 @@ module CsvMadness
       end
     end
     
-    def self.write_to_file( spreadsheet, file, opts )
+    def self.write_to_file( spreadsheet, file, opts = {} )
+      file = Pathname.new(file).expand_path
       File.open( file, "w" ) do |f|
         f << spreadsheet.to_csv( opts )
       end
@@ -113,19 +121,19 @@ module CsvMadness
       
       load_csv
       
-      set_columns( @opts[:columns] )
+      set_initial_columns( @opts[:columns] )
       
 
       create_record_class
       package
       
-      @index_columns = case opts[:index]
+      @index_columns = case @opts[:index]
       when NilClass
         []
       when Symbol
-        [ opts[:index] ]
+        [ @opts[:index] ]
       when Array
-        opts[:index]
+        @opts[:index]
       end
         
       reindex
@@ -170,33 +178,71 @@ module CsvMadness
       @records.map(&col)
     end
     
+    # retrieve multiple columns.  Returns an array of the form
+    # [ [record1:col1, record1:col2...], [record2:col1, record2:col2...] [...] ]
     def multiple_columns(*args)
-      @records.inject([]){ |collector, record|
-        collector << args.map{ |arg| record.send(arg) }
-        collector
+      @records.inject([]){ |memo, record|
+        memo << args.map{ |arg| record.send(arg) }
+        memo
       }
     end
     
-
-    def alter_cells( &block )
-      @records.each do |record|
-        @columns.each_with_index do |column, cindex|
-          record[cindex] = yield( record[cindex], record )
-        end
+    # if blank is defined, only the records which are non-blank in that
+    # column will actually be yielded.  The rest will be set to the provided
+    # default
+    def alter_cells( blank = :undefined, &block )
+      @columns.each_with_index do |column, cindex|
+        alter_column( column, blank, &block )
       end
     end
 
     # if column doesn't exist, silently fails.  Proper behavior?  Dunno.
-    def alter_column( column, &block )
+    def alter_column( column, blank = :undefined, &block )
       if cindex = @columns.index( column )
         for record in @records
-          record[cindex] = yield( record[cindex], record )
+          if record.blank?(column) && blank != :undefined
+            record[cindex] = blank
+          else
+            record[cindex] = yield( record[cindex], record )
+          end
         end
       end
     end
     
-    def set_column_type( column, type )
-      alter_column( column, &COLUMN_TYPES[type] )
+    def add_column( column, &block )
+      raise "Column already exists" if @columns.include?( column )
+      @columns << column
+      
+      # add empty column to each row
+      @records.map{ |r|
+        r.csv_data << {column => ""} 
+      }
+      
+      update_data_accessor_module
+      
+      if block_given?
+        alter_column( column ) do |val, record|
+          yield val, record
+        end
+      end
+    end
+    
+    def drop_column( column )
+      raise "Column does not exist" unless @columns.include?( column )
+      
+      @columns.delete( column )
+      
+      key = column.to_s
+      
+      @records.map{ |r|
+        r.csv_data.delete( key )
+      }
+      
+      update_data_accessor_module
+    end
+    
+    def set_column_type( column, type, blank = :undefined )
+      alter_column( column, blank, &COLUMN_TYPES[type] )
     end
 
     # Note: If a block is given, the mod arg will be ignored.
@@ -271,7 +317,7 @@ module CsvMadness
     #   otherwise, you end up with accessors like record.col1, record.col2, record.col3...
     # If the columns given doesn't match the number of columns in the spreadsheet 
     # prints a warning and a comparison of the columns to the headers.
-    def set_columns( columns = nil )
+    def set_initial_columns( columns = nil )
       if columns.nil?
         if @opts[:header] == false    #
           @columns = (0...csv_column_count).map{ |i| :"col#{i}" }
@@ -311,22 +357,22 @@ module CsvMadness
     def csv_column_count
       fetch_csv_headers.length
     end
+    
+    def columns_to_mapping
+      @columns.each_with_index.inject({}){ |memo, item| 
+        memo[item.first] = item.last
+        memo 
+      }
+    end
   
     def create_data_accessor_module
-      columns = @columns
-      @module = Module.new do
-        columns.each_with_index do |column, i|
-          eval <<-EOF
-            def #{column}
-              self.csv_data[#{i}]
-            end
-            
-            def #{column}=( val )
-              self.csv_data[#{i}] = val
-            end
-          EOF
-        end
-      end
+      # columns = @columns                 # yes, this line is necessary. Module.new has its own @vars.
+      
+      @module = DataAccessorModule.new( columns_to_mapping )
+    end
+    
+    def update_data_accessor_module
+      @module.remap_accessors( columns_to_mapping )
     end
   end
 end

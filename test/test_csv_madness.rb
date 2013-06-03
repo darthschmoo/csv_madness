@@ -99,6 +99,15 @@ class TestCsvMadness < Test::Unit::TestCase
           end
         end
       
+        should "set ID column to floats" do
+          @simple.set_column_type(:id, :float)
+        
+          @simple.records.each do |record|
+            assert_kind_of Float, record.id
+            assert_includes [1.0,2.0,3.0,4.0], record.id
+          end
+        end
+        
         should "parse a date column with one invalid date" do
           @simple.set_column_type( :born, :date )
           born1 = @simple[0].born
@@ -171,6 +180,7 @@ class TestCsvMadness < Test::Unit::TestCase
       end
       
       should "write to an output file properly" do
+        # debugger
         @outfile = @csv_output_path.join("output_nilfile.csv")
         @nilsheet.write_to_file( @outfile, force_quotes: true )
         
@@ -180,5 +190,43 @@ class TestCsvMadness < Test::Unit::TestCase
         assert_match /"age","born"/, @to_csv
       end
     end
+    
+    context "testing add/remove column transformations" do
+      context "with simple spreadsheet loaded" do
+        setup do
+          load_simple
+        end
+        
+        should "add column" do
+          @simple.add_column( :compound ) do |h, record|
+            v = "#{record.fname} #{record.lname} #{record.id}"
+          end
+          
+          load_mary
+          assert_equal "Mary Moore 1", @mary.compound
+        end
+        
+        should "drop column" do
+          load_mary
+          assert @mary.respond_to?(:lname)
+          assert_equal "Moore", @mary.lname
+          
+          @simple.drop_column( :lname )
+          
+          assert @mary.respond_to?(:age)
+          assert_equal "Mary", @mary.fname
+          assert_equal false, @mary.respond_to?(:lname)
+          assert_equal "27", @mary.age
+        end
+      end
+    end
+  end
+  
+  def load_simple
+    @simple = CsvMadness.load( "simple.csv", index: [:id] )
+  end
+  
+  def load_mary
+    @mary = @simple.fetch( :id, "1" )
   end
 end

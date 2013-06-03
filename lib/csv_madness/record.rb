@@ -35,5 +35,9 @@ module CsvMadness
     def to_csv( opts = {} )
       self.columns.map{|col| self.send(col) }.to_csv( opts )
     end
+    
+    def blank?( col )
+      (self.send( col ).to_s || "").strip.length == 0
+    end
   end
 end

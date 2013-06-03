@@ -1,9 +1,164 @@
-= csv_madness
+= csv_madness : turn your CSV rows into happycrazy objects.
 
-Description goes here.
+== What is it?
+
+CSV Madness tries to remove what little pain is left from Ruby's CSV class.  Load a CSV file, and manipulate your data using an array of objects with customizable getter/setter methods.
+
+
+== Why should I use it?
+
+I like brief code and I cannot lie.  
+
+
+== Examples
+
+CsvMadness makes some assumptions about your CSV file.  It does assume headers, for example.  
+
+The simplest case is when your columns are nicely named.  For example, if you have a csv file named <tt>~/data/people.csv</tt>:
+
+<code>
+"id","fname","lname","age","born"
+"1","Mary","Moore","27","1986-04-08 15:06:10"
+"2","Bill","Paxton","39","1974-02-22"
+"3","Charles","Darwin","72",""
+"4","Chuck","Norris","57","1901-03-02"
+</code>
+
+... then you can write code like so:
+
+'''require 'csv_madness'
+sheet = CsvMadness.load( "~/data/people.csv" )
+sheet.columns   # => [:id, :fname, :lname, :age, :born]
+sheet.records.map(&:id) # => ["1", "2", "3", "4"]
+sheet.set_column_type(:id, :float)
+sheet.records.map(&:id) # => [1.0, 2.0, 3.0, 4.0]
+sheet.alter_column(:id) do |id|
+  id + rand() - 0.5
+end    
+
+sheet.records.map(&:id) # => [0.7186, 2.30134, 2.90132, 4.30124]  (your results may vary)
+mary = sheet[0]
+
+"#{mary.lname}, #{mary.fname} (#{mary.id})"  # => "Moore, Mary (1)"
+'''
+
+If you're not satisfied with your column names, you can send your own, in the column order.  An index can also be provided, which will allow you to use <tt>.fetch()</tt> to find specific records quickly:
+
+'''require 'csv_madness'
+sheet = CsvMadness.load( "~/data/people.csv", 
+                         columns: [:uid, :first_name, :last_name, :years_on_planet, :birthday],
+                         index: :uid )
+
+sheet.fetch("2").years_on_planet      # => "39"
+'''
+
+**Note:** you can provide multiple indexes as an array.  However many columns you index, you'll run into trouble if the index isn't unique for each record.  (that may change in the future)
+
+
+It's useful to clean up your files.  Say you have:
+
+""""id","fname","lname","age","  born  "
+"1 ","Mary  ","Moore","27","1986-04-08 15:06:10"
+"","  Bill ","Paxton",,"  Feb. 22, 1974  "
+,"Charles "," Darwin","72 ",
+"4","Chuck","Norris",,"  2 March 1901   "
+"""
+
+Ick.  Missing IDs, inconsistent date formats, leading and trailing whitespace...  We can fix this.
+
+"""require 'csv_madness'
+sheet = CsvMadness.load( "~/data/people.csv" )
+sheet.alter_cells do |cell, record|
+  (cell || "").strip
+end   # removes leading and trailing whitespace, and turns nils into ""
+
+sheet.set_column_type(:id, :integer, nil)  # the last argument provides a default for blank records.
+
+# assumes the missing ids can be filled in sequentially.
+# While .alter_column() does take a blank as a second argument, 
+# that's not what we want here.  If a blank is provided, your 
+# code will never see the records with blank entries.
+sheet.alter_column(:id) do |id, record|
+  @count ||= 1
+  if id.nil?
+    id = @count
+    @count += 1
+  else
+    @count = id + 1
+  end
+  
+  id
+end
+
+sheet.records.map(&:id)    #  => [1, 2, 3, 4] 
+
+require 'time'
+sheet.alter_column(:born) do |date_string|
+  begin
+    Time.parse( date_string ).strftime("%Y-%m-%d")
+  rescue ArgumentError
+    ""
+  end
+end
+
+sheet.records.map(&:date)    #  => ["1986-04-08", "1974-02-22", "", "1901-03-02"] 
+
+# The same thing can be accomplished more simply by saying <tt>sheet.set_column_type(:date)</tt>. 
+# Even better, record.date is then a Time object
+
+# Now calculate everyone's age (ignoring and overriding the existing data)
+sheet.alter_column(:age) do |age, record|
+  if record.blank?(:born)
+    ""
+  else
+    ((Time.now - Time.parse(record.born)) / 365.25 / 24 / 60 / 60).to_i  # not production-worthy code
+  end
+end
+
+sheet.write_to_file( "~/data/people.clean.csv", force_quotes: true ) # save the cleaned data for the next stage of your process
+"""
+
+You could do something similar to clean and standardize phone numbers, detect and delete/complete invalid emails, etc.
+
+
+=== Adding and removing columns
+
+# Add 72 years to the date born.  
+sheet.set_column_type( :born, :date )  # replace date strings with Time objects
+
+sheet.add_column( :expected_death_date ) do |date, record|
+  record.born + ( 72 * 365 * 24 * 60 * 60 )
+end
+
+puts sheet[0].expected_death_date     # should be in 2058
+
+# But that's just morbid, so we drop the column
+sheet.drop_column( :expected_death_date )
+
+
+=== Using columns
+
+sheet.set_column_type( :id, :integer )
+
+
+# Returns each record's id, as an array
+sheet.column( :id ).max      #  ==> 4
+
+
+
+
+
+There are lots of other features, but they'll take time to test and document.
+
+
+
+
+
 
 == Contributing to csv_madness
  
+Instructions are boilerplate from Jeweler, but they make sense enough: 
+
 * Check out the latest master to make sure the feature hasn't been implemented or the bug hasn't been fixed yet.
 * Check out the issue tracker to make sure someone already hasn't requested it and/or contributed it.
 * Fork the project.
@@ -12,8 +167,8 @@ Description goes here.
 * Make sure to add tests for it. This is important so I don't break it in a future version unintentionally.
 * Please try not to mess with the Rakefile, version, or history. If you want to have your own version, or is otherwise necessary, that is fine, but please isolate to its own commit so I can cherry-pick around it.
 
+
 == Copyright
 
-Copyright (c) 2013 Bryce Anderson. See LICENSE.txt for
-further details.
+Copyright (c) 2013 Bryce Anderson. See LICENSE.txt for further details.
 
