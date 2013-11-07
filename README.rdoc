@@ -121,9 +121,9 @@ sheet.write_to_file( "~/data/people.clean.csv", force_quotes: true ) # save the 
 You could do something similar to clean and standardize phone numbers, detect and delete/complete invalid emails, etc.
 
 
-=== Adding and removing columns
+=== Adding, removing, and renaming columns ===
 
-# Add 72 years to the date born.  
+# Add 72 years to the date born.
 sheet.set_column_type( :born, :date )  # replace date strings with Time objects
 
 sheet.add_column( :expected_death_date ) do |date, record|
@@ -135,8 +135,10 @@ puts sheet[0].expected_death_date     # should be in 2058
 # But that's just morbid, so we drop the column
 sheet.drop_column( :expected_death_date )
 
+# Or, if you think you need the information, but need to be a bit more euphemistic about it
+sheet.rename_column( :expected_death_date, :expiration_date )
 
-=== Using columns
+=== Using columns ===
 
 sheet.set_column_type( :id, :integer )
 

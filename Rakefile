@@ -33,9 +33,11 @@ Jeweler::Tasks.new do |gem|
                 "./VERSION",
                 "./README.rdoc",
                 "./Rakefile",
+                "./CHANGELOG.markdown",
                 "./test/csv/simple.csv",
                 "./test/helper.rb",
-                "./test/test_csv_madness.rb" ]
+                "./test/test_csv_madness.rb",
+                "./test/test_sheet.rb" ]
 end
 
 Jeweler::RubygemsDotOrgTasks.new

@@ -13,11 +13,21 @@ module CsvMadness
     end
     
     def [] key
-      @csv_data[key] 
+      case key
+      when String, Integer
+        @csv_data[key] 
+      when Symbol
+        @csv_data[key.to_s]
+      end
     end
     
     def []= key, val
-      @csv_data[key] = val
+      case key
+      when String, Integer
+        @csv_data[key] = val
+      when Symbol
+        @csv_data[key.to_s] = val
+      end
     end
     
     def columns
@@ -37,7 +47,7 @@ module CsvMadness
     end
     
     def blank?( col )
-      (self.send( col ).to_s || "").strip.length == 0
+      (self.send( col.to_sym ).to_s || "").strip.length == 0
     end
   end
 end

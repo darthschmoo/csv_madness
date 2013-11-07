@@ -1,26 +1,21 @@
 require 'helper'
 
-class TestCsvMadness < Test::Unit::TestCase
+class TestCsvMadness < MadTestCase
   context "all:" do
     setup do
-      @csv_search_path = Pathname.new( __FILE__ ).dirname.join("csv")
-      @csv_output_path = @csv_search_path.join("out")
-      CsvMadness::Sheet.add_search_path( @csv_search_path )
+      set_spreadsheet_paths
+      load_simple_spreadsheet
     end
 
     teardown do
-      if defined?(FileUtils)
-        FileUtils.rm_rf( Dir.glob( @csv_output_path.join("**","*") ) )
-      else
-        puts "fileutils not defined"
-        `rm -rf #{@csv_output_path.join('*')}`
-      end
+      empty_output_folder
     end
     
     context "testing sheet basics" do
       should "not accept duplicate search paths" do
+        @path_count = CsvMadness::Sheet.search_paths.length
         CsvMadness::Sheet.add_search_path( Pathname.new( __FILE__ ).dirname.join("csv") )
-        assert_equal 1, CsvMadness::Sheet.instance_variable_get("@search_paths").length
+        assert_equal @path_count, CsvMadness::Sheet.search_paths.length
       end
     
       should "load a simple spreadsheet" do
@@ -49,11 +44,11 @@ class TestCsvMadness < Test::Unit::TestCase
     context "testing transformations" do
       context "with a simple spreadsheet loaded" do
         setup do
-          @simple = CsvMadness.load( "simple.csv", index: [:id] )
+          load_simple_spreadsheet
         end
       
         teardown do
-          @simple = nil
+          unload_simple_spreadsheet
         end
       
         should "transform every cell" do
@@ -154,6 +149,49 @@ class TestCsvMadness < Test::Unit::TestCase
           assert_equal records.length, records.compact.length
           assert_equal 2, records.length
           assert_equal "1", records.first.id
+        end 
+        
+        should "rename columns" do
+          load_mary
+          
+          assert_equal "Mary", @mary.fname
+          assert_equal "Moore", @mary.lname
+          assert_equal "Mary", @mary[1]
+          assert_equal "Moore", @mary[2]
+          
+          @simple.rename_column( :fname, :first_name )
+          @simple.rename_column( :lname, :last_name )
+          
+          assert_equal "Mary", @mary.first_name
+          assert_equal "Moore", @mary.last_name
+          assert_equal "Mary", @mary[1]
+          assert_equal "Moore", @mary[2]
+        end
+        
+        should "rename an index column" do
+          @simple.rename_column( :id, :identifier )
+          @mary = @simple.fetch( :identifier, "1" )
+          assert_equal "1", @mary.identifier
+        end
+        
+        should "rename an index column and ensure that the outputted spreadsheet has the new column name" do
+          @simple.rename_column( :id, :identifier )
+          @outfile = @csv_output_path.join("output.csv")
+          @simple.write_to_file( @outfile, force_quotes: true )
+
+          @simple = CsvMadness.load( @outfile, index: [:identifier] )
+          
+          load_mary
+          assert_equal "Mary", @mary.fname
+        end
+        
+        should "filter! records" do
+          @simple.filter! do |record|
+            record.id == BILL_ID || record.id == CHUCK_ID
+          end
+          
+          assert_equal 2, @simple.records.length
+          
         end
       end
     end
@@ -194,7 +232,7 @@ class TestCsvMadness < Test::Unit::TestCase
     context "testing add/remove column transformations" do
       context "with simple spreadsheet loaded" do
         setup do
-          load_simple
+          load_simple_spreadsheet
         end
         
         should "add column" do
@@ -220,13 +258,5 @@ class TestCsvMadness < Test::Unit::TestCase
         end
       end
     end
-  end
-  
-  def load_simple
-    @simple = CsvMadness.load( "simple.csv", index: [:id] )
-  end
-  
-  def load_mary
-    @mary = @simple.fetch( :id, "1" )
   end
 end

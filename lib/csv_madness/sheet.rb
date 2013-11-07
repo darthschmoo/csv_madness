@@ -30,7 +30,8 @@ module CsvMadness
     # Used to make getter/setter names out of the original header strings.
     # " hello;: world! " => :hello_world
     def self.getter_name( name )
-      name = name.strip.gsub(/\s+/,"_").gsub(/(\W|_)+/, "" ).downcase
+      name = name.strip.gsub( /\s+/, "_" ).gsub( /(\W|_)+/, "_" ).downcase
+      name = name.gsub( /_+$/, "" )
       if name.match( /^\d/ )
         name = "_#{name}"
       end
@@ -43,7 +44,15 @@ module CsvMadness
     def self.add_search_path( path )
       @search_paths ||= []
       path = Pathname.new( path ).expand_path
+      unless path.directory?
+        raise "The given path does not exist"
+      end
+      
       @search_paths << path unless @search_paths.include?( path )
+    end
+    
+    def self.search_paths
+      @search_paths
     end
     
     def self.from( csv_file, opts = {} )
@@ -83,7 +92,7 @@ module CsvMadness
     end
     
     def self.write_to_file( spreadsheet, file, opts = {} )
-      file = Pathname.new(file).expand_path
+      file = file.fwf_filepath.expand_path
       File.open( file, "w" ) do |f|
         f << spreadsheet.to_csv( opts )
       end
@@ -99,7 +108,7 @@ module CsvMadness
       end
     end
     
-    attr_reader :columns, :records, :spreadsheet_file, :record_class
+    attr_reader :columns, :index_columns, :records, :spreadsheet_file, :record_class
     # opts: 
     #   index: ( [:id, :id2 ] )
     #       columns you want mapped for quick 
@@ -115,28 +124,37 @@ module CsvMadness
     #   header:   false       
     #       anything else, we assume the csv file has a header row
     def initialize( spreadsheet, opts = {} )
-      @spreadsheet_file = self.class.find_spreadsheet_in_filesystem( spreadsheet )
+      if spreadsheet.is_a?(Array)
+        @spreadsheet_file = nil
+        
+      else
+        @spreadsheet_file = self.class.find_spreadsheet_in_filesystem( spreadsheet )
+      end
       @opts = opts
       @opts[:header] = (@opts[:header] == false ? false : true)  # true unless already explicitly set to false
       
+      reload_spreadsheet
+    end
+    
+    def reload_spreadsheet( opts = @opts )
       load_csv
-      
-      set_initial_columns( @opts[:columns] )
-      
-
+      set_initial_columns( opts[:columns] )
       create_record_class
       package
       
-      @index_columns = case @opts[:index]
+      set_index_columns( opts[:index] )
+      reindex
+    end
+
+    def set_index_columns( index_columns )
+      @index_columns = case index_columns
       when NilClass
         []
       when Symbol
-        [ @opts[:index] ]
+        [ index_columns ]
       when Array
-        @opts[:index]
+        index_columns
       end
-        
-      reindex
     end
     
     def [] offset
@@ -196,8 +214,9 @@ module CsvMadness
       end
     end
 
-    # if column doesn't exist, silently fails.  Proper behavior?  Dunno.
     def alter_column( column, blank = :undefined, &block )
+      raise "Column does not exist: #{column}" unless @columns.include?( column )
+      
       if cindex = @columns.index( column )
         for record in @records
           if record.blank?(column) && blank != :undefined
@@ -209,8 +228,9 @@ module CsvMadness
       end
     end
     
+    # If no block given, adds an empty column
     def add_column( column, &block )
-      raise "Column already exists" if @columns.include?( column )
+      raise "Column already exists: #{column}" if @columns.include?( column )
       @columns << column
       
       # add empty column to each row
@@ -241,10 +261,45 @@ module CsvMadness
       update_data_accessor_module
     end
     
+    def rename_column( column, new_name )
+      @columns[@columns.index(column)] = new_name
+      rename_index_column( column, new_name ) if @index_columns.include?( column )
+      update_data_accessor_module
+    end
+    
     def set_column_type( column, type, blank = :undefined )
       alter_column( column, blank, &COLUMN_TYPES[type] )
     end
 
+    
+    # If :reverse_merge is true, then the dest column is only overwritten for records where :dest is blank
+    def merge_columns( source, dest, opts = {} )
+      opts = { :drop_source => true, :reverse_merge => false, :default => "" }.merge( opts )
+      column_must_exist( source, dest )
+      
+      self.records.each do |record|
+        if opts[:reverse_merge] == false || record.blank?( dest )
+          record[dest] = record.blank?(source) ? opts[:default] : record[source]
+        end
+      end
+      
+      self.drop_column( source ) if opts[:drop_source]
+    end
+    
+    # By default, the
+    def concat_columns( col1, col2, opts = {} )
+      opts =  {:separator => '', :out => col1}.merge( opts )
+      
+      column_must_exist( col1, col2 )
+      self.add_column( opts[:out] ) unless self.columns.include?( opts[:out] )
+      
+      for record in self.records
+        record[ opts[:out] ] = "#{record[col1]}#{opts[:separator]}#{record[col2]}"
+      end
+    end
+    
+    alias :concatenate :concat_columns
+    
     # Note: If a block is given, the mod arg will be ignored.
     def add_record_methods( mod = nil, &block )
       if block_given?
@@ -283,6 +338,13 @@ module CsvMadness
           add_to_index( col, record.send(col), record )
         end
       end
+    end
+    
+    # shouldn't require reindex
+    def rename_index_column( column, new_name )
+      @index_columns[ @index_columns.index( column ) ] = new_name
+      @indexes[new_name] = @indexes[column]
+      @indexes.delete(column)
     end
     
     # Each spreadsheet has its own anonymous record class, and each CSV row instantiates
@@ -373,6 +435,12 @@ module CsvMadness
     
     def update_data_accessor_module
       @module.remap_accessors( columns_to_mapping )
+    end
+  
+    def column_must_exist( *cols )
+      for col in cols
+        raise ArgumentError.new( "#{caller[0]}: column :#{col} does not exist.") unless self.columns.include?(col)
+      end
     end
   end
 end
