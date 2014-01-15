@@ -9,7 +9,7 @@ module CsvMadness
   class Record
     attr_accessor :csv_data
     def initialize( data )
-      @csv_data = data
+      import_record_data( data )
     end
     
     def [] key
@@ -48,6 +48,22 @@ module CsvMadness
     
     def blank?( col )
       (self.send( col.to_sym ).to_s || "").strip.length == 0
+    end
+    
+    protected
+    def import_record_data( data )
+      case data
+      when CSV::Row
+        @csv_data = data
+      when Array
+        row = CSV::Row.new
+        
+        @csv_data = row
+      when Hash
+        row = CSV::Row.new
+        
+        @csv_data = row
+      end
     end
   end
 end

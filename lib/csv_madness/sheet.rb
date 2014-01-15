@@ -2,27 +2,55 @@ module CsvMadness
   class Sheet
     COLUMN_TYPES = {
       number: Proc.new do |cell, record|
-        if (cell || "").strip.match(/^\d*$/)
-          cell.to_i
-        else
-          cell.to_f
+        rval = cell
+        
+        unless cell.nil? || (cell.is_a?(String) && cell.length == 0)
+        
+          begin
+            rval = Integer(cell)
+          rescue
+            # do nothing
+          end
+        
+          unless rval.is_a?(Integer)
+            begin
+              rval = Float(cell)
+            rescue
+              # do nothing
+            end
+          end
         end
+        
+        rval
       end,
       
       integer: Proc.new do |cell, record|
-        cell.to_i
+        begin
+          Integer(cell)
+        rescue
+          cell
+        end
       end,
       
       float:   Proc.new do |cell, record|
-        cell.to_f
+        begin
+          Float(cell)
+        rescue
+          cell
+        end
       end,
       
       date:    Proc.new do |cell, record|
         begin
-          parse = Time.parse( cell )
+          parse = Time.parse( cell || "" )
         rescue ArgumentError
-          parse = "Invalid Time Format: <#{cell}>"
+          if cell =~ /^Invalid Time Format: /
+            parse = cell
+          else
+            parse = "Invalid Time Format: <#{cell}>"
+          end
         end
+        
         parse
       end
     }
@@ -123,21 +151,33 @@ module CsvMadness
     #   
     #   header:   false       
     #       anything else, we assume the csv file has a header row
-    def initialize( spreadsheet, opts = {} )
-      if spreadsheet.is_a?(Array)
-        @spreadsheet_file = nil
-        
+    def initialize( *args )
+      if args.last.is_a?(Hash)
+        @opts = args.pop
       else
-        @spreadsheet_file = self.class.find_spreadsheet_in_filesystem( spreadsheet )
+        @opts = {}
       end
-      @opts = opts
+      
+      firstarg = args.shift
+      
+      case firstarg
+      when NilClass
+        @spreadsheet_file = nil
+        @opts[:columns] ||= []
+      when String, FunWith::Files::FilePath, Pathname
+        @spreadsheet_file = self.class.find_spreadsheet_in_filesystem( firstarg )
+      when Array
+        @spreadsheet_file = nil
+        @opts[:columns] ||= firstarg
+      end
+      
       @opts[:header] = (@opts[:header] == false ? false : true)  # true unless already explicitly set to false
       
       reload_spreadsheet
     end
     
     def reload_spreadsheet( opts = @opts )
-      load_csv
+      load_csv if @spreadsheet_file
       set_initial_columns( opts[:columns] )
       create_record_class
       package
@@ -318,6 +358,7 @@ module CsvMadness
     
     protected
     def load_csv
+      
       # encoding seems to solve a specific problem with a specific spreadsheet, at an unknown cost.
       @csv = CSV.new( File.read(@spreadsheet_file).force_encoding("ISO-8859-1").encode("UTF-8"), 
                         { write_headers: true, 
@@ -410,7 +451,7 @@ module CsvMadness
     # Create objects that respond to the recipe-named methods
     def package
       @records = []
-      @csv.each do |row|
+      (@csv || []).each do |row|
         @records << @record_class.new( row )
       end
     end
