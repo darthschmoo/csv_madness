@@ -66,89 +66,122 @@ It's useful to clean up your files.  Say you have:
 
 Ick.  Missing IDs, inconsistent date formats, leading and trailing whitespace...  We can fix this.
 
-"""require 'csv_madness'
-sheet = CsvMadness.load( "~/data/people.csv" )
-sheet.alter_cells do |cell, record|
-  (cell || "").strip
-end   # removes leading and trailing whitespace, and turns nils into ""
+    require 'csv_madness'
+    
+    sheet = CsvMadness.load( "~/data/people.csv" )
+    
+    # remove leading and trailing whitespace, and turns nils into ""
+    sheet.alter_cells do |cell, record|
+      (cell || "").strip
+    end
 
-sheet.set_column_type(:id, :integer, nil)  # the last argument provides a default for blank records.
+    # the last argument provides a default for blank records.
+    sheet.set_column_type(:id, :integer, nil)
 
-# assumes the missing ids can be filled in sequentially.
-# While .alter_column() does take a blank as a second argument, 
-# that's not what we want here.  If a blank is provided, your 
-# code will never see the records with blank entries.
-sheet.alter_column(:id) do |id, record|
-  @count ||= 1
-  if id.nil?
-    id = @count
-    @count += 1
-  else
-    @count = id + 1
-  end
+    # assumes the missing ids can be filled in sequentially.
+    # While .alter_column() does take a default (second argument),
+    # which will fill in the blank cells, 
+    # that's not what we want here.  
+    # 
+    # If a blank is provided, your 
+    # code will never see the records with blank entries.
+    sheet.alter_column(:id) do |id, record|
+      @count ||= 1
+      if id.nil?
+        id = @count
+        @count += 1
+      else
+        @count = id + 1
+      end
   
-  id
-end
+      id
+    end
 
-sheet.records.map(&:id)    #  => [1, 2, 3, 4] 
+    sheet.column(:id)    #  => [1, 2, 3, 4]
 
-require 'time'
-sheet.alter_column(:born) do |date_string|
-  begin
-    Time.parse( date_string ).strftime("%Y-%m-%d")
-  rescue ArgumentError
-    ""
-  end
-end
+    # Reformat a column of dates.
+    require 'time'
+    sheet.alter_column(:born) do |date_string|
+      begin
+        Time.parse( date_string ).strftime("%Y-%m-%d")
+      rescue ArgumentError
+        ""
+      end
+    end
 
-sheet.records.map(&:date)    #  => ["1986-04-08", "1974-02-22", "", "1901-03-02"] 
+    sheet.column(:date)    #  => ["1986-04-08", "1974-02-22", "", "1901-03-02"] 
 
-# The same thing can be accomplished more simply by saying <tt>sheet.set_column_type(:date)</tt>. 
-# Even better, record.date is then a Time object
+    # The same thing can be accomplished more simply by saying <tt>sheet.set_column_type(:date)</tt>. 
+    # Even better, record.date is then a Time object
 
-# Now calculate everyone's age (ignoring and overriding the existing data)
-sheet.alter_column(:age) do |age, record|
-  if record.blank?(:born)
-    ""
-  else
-    ((Time.now - Time.parse(record.born)) / 365.25 / 24 / 60 / 60).to_i  # not production-worthy code
-  end
-end
+    # Now calculate everyone's age (ignoring and overriding the existing data)
+    sheet.alter_column(:age) do |age, record|
+      if record.blank?(:born)
+        ""
+      else
+        ((Time.now - Time.parse(record.born)) / 365.25 / 24 / 60 / 60).to_i  # not production-worthy code
+      end
+    end
 
-sheet.write_to_file( "~/data/people.clean.csv", force_quotes: true ) # save the cleaned data for the next stage of your process
-"""
+    # save the cleaned data for the next stage of your process
+    sheet.write_to_file( "~/data/people.clean.csv", force_quotes: true )
 
 You could do something similar to clean and standardize phone numbers, detect and delete/complete invalid emails, etc.
 
 
 === Adding, removing, and renaming columns ===
 
-# Add 72 years to the date born.
-sheet.set_column_type( :born, :date )  # replace date strings with Time objects
 
-sheet.add_column( :expected_death_date ) do |date, record|
-  record.born + ( 72 * 365 * 24 * 60 * 60 )
-end
+    # Add 72 years to the date born.
+    sheet.set_column_type( :born, :date )  # replace date strings with Time objects
 
-puts sheet[0].expected_death_date     # should be in 2058
+    sheet.add_column( :expected_death_date ) do |date, record|
+      record.born + ( 72 * 365 * 24 * 60 * 60 )
+    end
 
-# But that's just morbid, so we drop the column
-sheet.drop_column( :expected_death_date )
+    puts sheet[0].expected_death_date     # should be in 2058
 
-# Or, if you think you need the information, but need to be a bit more euphemistic about it
-sheet.rename_column( :expected_death_date, :expiration_date )
+    # But that's just morbid, so we drop the column
+    sheet.drop_column( :expected_death_date )
+
+    # Or, if you think you need the information, but need to be a bit more euphemistic about it
+    sheet.rename_column( :expected_death_date, :expiration_date )
+
 
 === Using columns ===
 
-sheet.set_column_type( :id, :integer )
 
 
-# Returns each record's id, as an array
-sheet.column( :id ).max      #  ==> 4
+    sheet.set_column_type( :id, :integer )
 
 
+    # Returns each record's id as an array of integers
+    sheet.column( :id ).max      #  ==> 4
 
 
+=== Builder ===
+
+You have an array of objects.  You want to write them to a spreadsheet.
+
+```ruby
+    sb = CsvMadness::Builder.new do |sb|
+      sb.column( :id )
+      sb.column( :addressee,              "addressee_custom" )
+      sb.column( :street_address,         "primary_address.street_address" )
+      sb.column( :supplemental_address_1, "primary_address.supplemental_address_1" )
+      sb.column( :city,                   "primary_address.city" )
+      sb.column( :state_code,             "primary_address.state_code" )
+      sb.column( :formatted_zip,          "primary_address.formatted_zip" )
+      sb.column( :phone,                  "phones.first.phone" )
+      sb.column( :leader,                 "congregation_fieldset.congregation_leader" )
+      sb.column( :denomination,           "congregation_fieldset.denomination" )
+      sb.column( :email,                  "emails.first.email" )
+    end
+
+    sheet = sb.build( [address1, address2, address3...] )
+```
+
+=== Documentation is incomplete ===
 
 There are lots of other features, but they'll take time to test and document.
 

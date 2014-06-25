@@ -1,30 +1,37 @@
-require 'rubygems'
-require 'bundler'
-
-begin
-  Bundler.setup(:default, :development)
-rescue Bundler::BundlerError => e
-  $stderr.puts e.message
-  $stderr.puts "Run `bundle install` to install missing gems"
-  exit e.status_code
-end
-
-require 'test/unit'
-require 'shoulda'
+# require 'rubygems'
+# require 'bundler'
+# 
+# begin
+#   Bundler.setup(:default, :development)
+# rescue Bundler::BundlerError => e
+#   $stderr.puts e.message
+#   $stderr.puts "Run `bundle install` to install missing gems"
+#   exit e.status_code
+# end
+# 
+# require 'test/unit'
+# require 'shoulda'
 
 $LOAD_PATH.unshift(File.join(File.dirname(__FILE__), '..', 'lib'))
 $LOAD_PATH.unshift(File.dirname(__FILE__))
 
+require 'fun_with_testing'
 require 'csv_madness'
 
-class Test::Unit::TestCase
-end
+# class Test::Unit::TestCase
+# end
 
-class MadTestCase < Test::Unit::TestCase
+class MadTestCase < FunWith::Testing::TestCase # Test::Unit::TestCase
+  include FunWith::Testing::Assertions::Basics
+  
   MARY_ID = "1"
   BILL_ID = "2"
   DARWIN_ID = "3"
   CHUCK_ID = "4"
+
+  def setup
+    set_spreadsheet_paths
+  end
   
   def load_mary
     id = @simple.index_columns.first
@@ -78,9 +85,9 @@ class MadTestCase < Test::Unit::TestCase
   end
    
   def set_spreadsheet_paths
-    @csv_search_path = Pathname.new( __FILE__ ).dirname.join("csv")
-    @csv_output_path = @csv_search_path.join("out")
-    CsvMadness::Sheet.add_search_path( @csv_search_path )
+    @csv_load_path = CsvMadness.root( "test", "csv" )
+    @csv_output_path = CsvMadness.root( "test", "csv", "out" )
+    CsvMadness::Sheet.add_search_path( @csv_load_path )
     CsvMadness::Sheet.add_search_path( @csv_output_path )
   end
   

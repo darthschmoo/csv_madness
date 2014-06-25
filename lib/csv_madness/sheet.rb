@@ -55,6 +55,8 @@ module CsvMadness
       end
     }
     
+    FORBIDDEN_COLUMN_NAMES = [:to_s]  # breaks things hard when you use them.  Probably not comprehensive, sadly.
+    
     # Used to make getter/setter names out of the original header strings.
     # " hello;: world! " => :hello_world
     def self.getter_name( name )
@@ -136,7 +138,7 @@ module CsvMadness
       end
     end
     
-    attr_reader :columns, :index_columns, :records, :spreadsheet_file, :record_class
+    attr_reader :columns, :index_columns, :records, :spreadsheet_file, :record_class, :opts
     # opts: 
     #   index: ( [:id, :id2 ] )
     #       columns you want mapped for quick 
@@ -174,6 +176,61 @@ module CsvMadness
       @opts[:header] = (@opts[:header] == false ? false : true)  # true unless already explicitly set to false
       
       reload_spreadsheet
+    end
+    
+    def <<( record )
+      self.add_record( record )
+    end
+    
+    def add_record( record )
+      case record
+      when Array
+        # CSV::Row.new( column names, column_entries ) (in same order as columns, natch) 
+        record = CSV::Row.new( self.columns, record )
+      when Hash
+        header = []
+        fields = []
+        
+        for col in self.columns
+          header << col
+          fields << record[col]
+        end
+        
+        record = CSV::Row.new( header, fields )
+      when CSV::Row
+        # do nothing
+      else
+        raise "sheet.add_record() doesn't take objects of type #{record.inspect}" unless record.respond_to?(:csv_data)
+        record = record.csv_data
+      end
+      
+      record = @record_class.new( record )
+      @records << record
+      add_to_indexes( record )
+    end
+    
+    # record can be the row number (integer from 0...@records.length)
+    # record can be the record itself (anonymous class)
+    def remove_record( record )
+      record = @records[record] if record.is_a?(Integer)
+      return if record.nil?
+      
+      self.remove_from_index( record )
+      @records.delete( record )
+    end
+    
+    # Here's the deal: you hand us a block, and we'll remove the records for which
+    # it yields _true_.
+    def remove_records( records = nil, &block )
+      if block_given?
+        for record in @records
+          remove_record( record ) if yield( record ) == true
+        end
+      else # records should be an array
+        for record in records
+          self.remove_record( record )
+        end
+      end
     end
     
     def reload_spreadsheet( opts = @opts )
@@ -231,7 +288,47 @@ module CsvMadness
       reindex
       @records
     end
-  
+    
+    
+    # give a copy of the current spreadsheet, but with no records
+    def blanked()
+      sheet = self.class.new
+      sheet.columns = @columns.clone
+      sheet.index_columns = @index_columns.clone
+      sheet.records = []
+      sheet.spreadsheet_file = nil
+      sheet.create_data_accessor_module
+      sheet.create_record_class
+      sheet.opts = @opts.clone
+      sheet.reindex
+      
+      sheet
+    end
+    
+    # give a block, and get back a hash.  
+    # The hash keys are the results of the block.
+    # The hash values are copies of the spreadsheets, with only the records
+    # which caused the block to return the key.
+    def split( &block )
+      sheets = Hash.new
+      
+      for record in @records
+        result_key = yield record
+        ( sheets[result_key] ||= self.blanked() ) << record
+      end
+
+      sheets
+      # sheet_args = self.blanked
+      # for key, record_set in records
+      #   sheet = self.clone
+      #   sheet.records = 
+      #   
+      #   records[key] = sheet
+      # end
+      # 
+      # records
+    end
+    
     def column col
       @records.map(&col)
     end
@@ -271,6 +368,7 @@ module CsvMadness
     # If no block given, adds an empty column
     def add_column( column, &block )
       raise "Column already exists: #{column}" if @columns.include?( column )
+      raise "#{column} is in the list FORBIDDEN_COLUMN_NAMES" if FORBIDDEN_COLUMN_NAMES.include?(column)
       @columns << column
       
       # add empty column to each row
@@ -356,7 +454,13 @@ module CsvMadness
       end
     end
     
+    def length
+      self.records.length
+    end
+    
     protected
+    attr_writer :columns, :index_columns, :records, :spreadsheet_file, :record_class, :opts    
+    
     def load_csv
       
       # encoding seems to solve a specific problem with a specific spreadsheet, at an unknown cost.
@@ -366,19 +470,32 @@ module CsvMadness
     end
       
     def add_to_index( col, key, record )
-      @indexes[col][key] = record
+      (@indexes[col] ||= {})[key] = record
+    end
+    
+    def add_to_indexes( records )
+      if records.is_a?( Array )
+        for record in records
+          add_to_indexes( record )
+        end
+      else
+        record = records
+        for col in @index_columns
+          add_to_index( col, record.send(col), record )
+        end
+      end
+    end
+    
+    def remove_from_index( record )
+      for col in @index_columns
+        @indexes[col].delete( record.send(col) )
+      end
     end
     
     # Reindexes the record lookup tables.
     def reindex
       @indexes = {}
-      for col in @index_columns
-        @indexes[col] = {}
-
-        for record in @records
-          add_to_index( col, record.send(col), record )
-        end
-      end
+      add_to_indexes( @records )
     end
     
     # shouldn't require reindex
@@ -422,18 +539,23 @@ module CsvMadness
     # prints a warning and a comparison of the columns to the headers.
     def set_initial_columns( columns = nil )
       if columns.nil?
-        if @opts[:header] == false    #
-          @columns = (0...csv_column_count).map{ |i| :"col#{i}" }
+        if @opts[:header] == false
+          columns = (0...csv_column_count).map{ |i| :"col#{i}" }
         else
-          @columns = fetch_csv_headers.map{ |name| self.class.getter_name( name ) }
+          columns = fetch_csv_headers.map{ |name| self.class.getter_name( name ) }
         end
       else
-        @columns = columns
-        unless @columns.length == csv_column_count
-          puts "Warning <#{@spreadsheet_file}>: columns array does not match the number of columns in the spreadsheet." 
+        unless !@csv || columns.length == csv_column_count
+          $stderr.puts "Warning <#{@spreadsheet_file}>: columns array does not match the number of columns in the spreadsheet." 
           compare_columns_to_headers
         end
       end
+      
+      for column in columns
+        raise "#{column} is in the list FORBIDDEN_COLUMN_NAMES" if FORBIDDEN_COLUMN_NAMES.include?(column)
+      end
+      
+      @columns = columns
     end
     
     # Printout so the user can see which CSV columns are being matched to which
@@ -443,7 +565,7 @@ module CsvMadness
       headers = fetch_csv_headers
 
       for i in 0...([@columns, headers].map(&:length).max)
-        puts "\t#{i}:  #{@columns[i]} ==> #{headers[i]}"
+        $stdout.puts "\t#{i}:  #{@columns[i]} ==> #{headers[i]}"
       end
     end
     

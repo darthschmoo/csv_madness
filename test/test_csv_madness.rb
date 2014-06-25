@@ -3,7 +3,6 @@ require 'helper'
 class TestCsvMadness < MadTestCase
   context "all:" do
     setup do
-      set_spreadsheet_paths
       load_simple_spreadsheet
     end
 
@@ -14,12 +13,12 @@ class TestCsvMadness < MadTestCase
     context "testing sheet basics" do
       should "not accept duplicate search paths" do
         @path_count = CsvMadness::Sheet.search_paths.length
-        CsvMadness::Sheet.add_search_path( Pathname.new( __FILE__ ).dirname.join("csv") )
+        CsvMadness::Sheet.add_search_path( @csv_load_path )
         assert_equal @path_count, CsvMadness::Sheet.search_paths.length
       end
     
       should "load a simple spreadsheet" do
-        simple = CsvMadness::Sheet.from("simple.csv")
+        simple = CsvMadness::Sheet.from( "simple.csv" )
         assert_equal "Mary", simple[0].fname
         assert_equal "Paxton", simple[1].lname
         assert_equal "72", simple[2].age

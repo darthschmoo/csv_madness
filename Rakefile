@@ -20,24 +20,16 @@ Jeweler::Tasks.new do |gem|
   gem.name = "csv_madness"
   gem.homepage = "http://github.com/darthschmoo/csv_madness"
   gem.license = "MIT"
-  gem.summary = %Q{CSV Madness turns your CSV rows into happycrazy objects.}
-  gem.description = %Q{CSV Madness removes what little pain is left from Ruby's CSV class.  Load a CSV file, and get back an array of objects with customizable getter/setter methods.}
+  gem.summary = "CSV Madness turns your CSV rows into happycrazy objects."
+  gem.description = "CSV Madness removes what little pain is left from Ruby's CSV class.  Load a CSV file, and get back an array of objects with customizable getter/setter methods."
   gem.email = "keeputahweird@gmail.com"
   gem.authors = ["Bryce Anderson"]
+  
   # dependencies defined in Gemfile
-  gem.files = [ "./lib/csv_madness/data_accessor_module.rb", 
-                "./lib/csv_madness/record.rb", 
-                "./lib/csv_madness/sheet.rb", 
-                "./lib/csv_madness.rb", 
-                "./Gemfile",
-                "./VERSION",
-                "./README.rdoc",
-                "./Rakefile",
-                "./CHANGELOG.markdown",
-                "./test/csv/simple.csv",
-                "./test/helper.rb",
-                "./test/test_csv_madness.rb",
-                "./test/test_sheet.rb" ]
+  gem.files = Dir.glob( File.join( ".", "lib", "**", "*.rb" ) ) + 
+              Dir.glob( File.join( ".", "test", "**", "*" ) ) +
+              %w( Gemfile Rakefile LICENSE.txt README.rdoc VERSION CHANGELOG.markdown csv_madness.gemspec )
+    
 end
 
 Jeweler::RubygemsDotOrgTasks.new

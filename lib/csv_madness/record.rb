@@ -8,6 +8,7 @@ module CsvMadness
   # symbol.
   class Record
     attr_accessor :csv_data
+    
     def initialize( data )
       import_record_data( data )
     end
@@ -34,6 +35,10 @@ module CsvMadness
       self.class.spreadsheet.columns
     end
     
+    def self.columns
+      self.spreadsheet.columns
+    end
+    
     def self.spreadsheet= sheet
       @spreadsheet = sheet
     end
@@ -46,6 +51,14 @@ module CsvMadness
       self.columns.map{|col| self.send(col) }.to_csv( opts )
     end
     
+    def to_hash
+      self.columns.inject({}){ |hash, col| hash[col] = self.send( col ); hash }
+    end
+    
+    def to_a
+      self.to_hash.to_a
+    end
+    
     def blank?( col )
       (self.send( col.to_sym ).to_s || "").strip.length == 0
     end
@@ -53,17 +66,25 @@ module CsvMadness
     protected
     def import_record_data( data )
       case data
-      when CSV::Row
-        @csv_data = data
       when Array
-        row = CSV::Row.new
-        
-        @csv_data = row
+        csv_data = CSV::Row.new( self.columns, data )
       when Hash
-        row = CSV::Row.new
+        fields = self.columns.map do |col|
+          data[col]
+        end
+        # for col in self.columns
+        #   fields << data[col]
+        # end
         
-        @csv_data = row
+        csv_data = CSV::Row.new( self.columns, fields )
+      when CSV::Row
+        csv_data = data
+      else
+        raise "record.import_record_data() doesn't take objects of type #{data.inspect}" unless data.respond_to?(:csv_data)
+        csv_data = data.csv_data.clone
       end
+      
+      @csv_data = csv_data
     end
   end
 end
