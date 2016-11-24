@@ -1,11 +1,14 @@
 module CsvMadness
   class Builder
+    attr_accessor :label
+    
     def initialize( &block )
       @columns = {}
       @column_syms = []
+
       @module = Module.new   # for extending
       self.extend( @module )
-      yield self
+      yield self if block_given?
     end
 
     def column( sym, method_path = nil, &block )

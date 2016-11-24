@@ -15,6 +15,4 @@ group :development do
   # gem "debugger"
 end
 
-# gem "fun_with_files", "~> 0.0", ">= 0.0.7"
-# gem "fun_with_version_strings", "~> 0.0"
 gem 'fun_with_gems', '~> 0.0', ">= 0.0.2"

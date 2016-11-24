@@ -110,7 +110,7 @@ class TestCsvMadness < MadTestCase
           assert_in_delta Time.parse("1986-04-08"), born1, 3600 * 24
         
           assert_kind_of String, born3
-          assert_match /Invalid Time Format/, born3
+          assert_match( /Invalid Time Format/, born3 )
         end
       
         should "successfully decorate record objects with new functionality" do
@@ -212,8 +212,8 @@ class TestCsvMadness < MadTestCase
       
       should "to_csv properly" do
         @to_csv = @nilsheet.to_csv( force_quotes: true )
-        assert_match /"Moore"/, @to_csv
-        assert_match /"age","born"/, @to_csv
+        assert_match( /"Moore"/, @to_csv )
+        assert_match( /"age","born"/, @to_csv )
       end
       
       should "write to an output file properly" do
@@ -223,8 +223,8 @@ class TestCsvMadness < MadTestCase
         
         assert File.exist?( @outfile )
         @to_csv = File.read( @outfile )
-        assert_match /"Moore"/, @to_csv
-        assert_match /"age","born"/, @to_csv
+        assert_match( /"Moore"/, @to_csv )
+        assert_match( /"age","born"/, @to_csv )
       end
     end
     
@@ -236,7 +236,7 @@ class TestCsvMadness < MadTestCase
         
         should "add column" do
           @simple.add_column( :compound ) do |h, record|
-            v = "#{record.fname} #{record.lname} #{record.id}"
+            "#{record.fname} #{record.lname} #{record.id}"
           end
           
           load_mary

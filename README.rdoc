@@ -7,62 +7,62 @@ CSV Madness tries to remove what little pain is left from Ruby's CSV class.  Loa
 
 == Why should I use it?
 
-I like brief code and I cannot lie.  
+I like brief code and I cannot lie.
 
 
 == Examples
 
 CsvMadness makes some assumptions about your CSV file.  It does assume headers, for example.  
 
-The simplest case is when your columns are nicely named.  For example, if you have a csv file named <tt>~/data/people.csv</tt>:
+The simplest case is when your columns are nicely named.  For example, if you have a csv file named `~/data/people.csv`:
 
-<code>
-"id","fname","lname","age","born"
-"1","Mary","Moore","27","1986-04-08 15:06:10"
-"2","Bill","Paxton","39","1974-02-22"
-"3","Charles","Darwin","72",""
-"4","Chuck","Norris","57","1901-03-02"
-</code>
+    "id","fname","lname","age","born"
+    "1","Mary","Moore","27","1986-04-08 15:06:10"
+    "2","Bill","Paxton","39","1974-02-22"
+    "3","Charles","Darwin","72",""
+    "4","Chuck","Norris","57","1901-03-02"
+
 
 ... then you can write code like so:
 
-'''require 'csv_madness'
-sheet = CsvMadness.load( "~/data/people.csv" )
-sheet.columns   # => [:id, :fname, :lname, :age, :born]
-sheet.records.map(&:id) # => ["1", "2", "3", "4"]
-sheet.set_column_type(:id, :float)
-sheet.records.map(&:id) # => [1.0, 2.0, 3.0, 4.0]
-sheet.alter_column(:id) do |id|
-  id + rand() - 0.5
-end    
+    require 'csv_madness'
+    
+    sheet = CsvMadness.load( "~/data/people.csv" )
+    sheet.columns   # => [:id, :fname, :lname, :age, :born]
+    sheet.records.map(&:id) # => ["1", "2", "3", "4"]
+    sheet.set_column_type(:id, :float)
+    sheet.records.map(&:id) # => [1.0, 2.0, 3.0, 4.0]
+    sheet.alter_column(:id) do |id|
+      id + rand() - 0.5
+    end    
 
-sheet.records.map(&:id) # => [0.7186, 2.30134, 2.90132, 4.30124]  (your results may vary)
-mary = sheet[0]
+    sheet.records.map(&:id) # => [0.7186, 2.30134, 2.90132, 4.30124]  (your results may vary)
+    mary = sheet[0]
 
-"#{mary.lname}, #{mary.fname} (#{mary.id})"  # => "Moore, Mary (1)"
-'''
+    "#{mary.lname}, #{mary.fname} (#{mary.id})"  # => "Moore, Mary (1)"
+
 
 If you're not satisfied with your column names, you can send your own, in the column order.  An index can also be provided, which will allow you to use <tt>.fetch()</tt> to find specific records quickly:
 
-'''require 'csv_madness'
-sheet = CsvMadness.load( "~/data/people.csv", 
-                         columns: [:uid, :first_name, :last_name, :years_on_planet, :birthday],
-                         index: :uid )
+    require 'csv_madness'
+    sheet = CsvMadness.load( "~/data/people.csv", 
+                             columns: [:uid, :first_name, :last_name, :years_on_planet, :birthday],
+                             index: :uid )
 
-sheet.fetch("2").years_on_planet      # => "39"
-'''
+    sheet.fetch("2").years_on_planet      # => "39"
+
 
 **Note:** you can provide multiple indexes as an array.  However many columns you index, you'll run into trouble if the index isn't unique for each record.  (that may change in the future)
 
 
 It's useful to clean up your files.  Say you have:
 
-""""id","fname","lname","age","  born  "
-"1 ","Mary  ","Moore","27","1986-04-08 15:06:10"
-"","  Bill ","Paxton",,"  Feb. 22, 1974  "
-,"Charles "," Darwin","72 ",
-"4","Chuck","Norris",,"  2 March 1901   "
-"""
+    "id","fname","lname","age","  born  "
+    "1 ","Mary  ","Moore","27","1986-04-08 15:06:10"
+    "","  Bill ","Paxton",,"  Feb. 22, 1974  "
+    "3","Charles "," Darwin","72 "
+    "4","Chuck","Norris",,"  2 March 1901   "
+
 
 Ick.  Missing IDs, inconsistent date formats, leading and trailing whitespace...  We can fix this.
 
@@ -163,27 +163,35 @@ You could do something similar to clean and standardize phone numbers, detect an
 
 You have an array of objects.  You want to write them to a spreadsheet.
 
-```ruby
     sb = CsvMadness::Builder.new do |sb|
       sb.column( :id )
-      sb.column( :addressee,              "addressee_custom" )
-      sb.column( :street_address,         "primary_address.street_address" )
-      sb.column( :supplemental_address_1, "primary_address.supplemental_address_1" )
-      sb.column( :city,                   "primary_address.city" )
-      sb.column( :state_code,             "primary_address.state_code" )
-      sb.column( :formatted_zip,          "primary_address.formatted_zip" )
-      sb.column( :phone,                  "phones.first.phone" )
-      sb.column( :leader,                 "congregation_fieldset.congregation_leader" )
-      sb.column( :denomination,           "congregation_fieldset.denomination" )
-      sb.column( :email,                  "emails.first.email" )
+      sb.column( :addressee,      "addressee_custom" )
+      sb.column( :street,         "primary_address.street_address" )
+      sb.column( :street2,        "primary_address.supplemental_address_1" )
+      sb.column( :city,           "primary_address.city" )
+      sb.column( :state_code,     "primary_address.state_code" )
+      sb.column( :formatted_zip,  "primary_address.formatted_zip" )
+      sb.column( :phone,          "phones.first.phone" )
+      sb.column( :contact,        "congregation_fieldset.congregation_leader" )
+      sb.column( :email,          "emails.first.email" )
+      sb.column( :greeting ) do |contact|
+        if contact.business?
+          "To our friends at #{contact.organization_name},"
+        elsif contact.person?
+          "Dear #{ contact.title } #{ contact.last_name }"
+        end
+      end
+      
     end
 
     sheet = sb.build( [address1, address2, address3...] )
-```
+    
+    outfile = FunWith::Files::FilePath.home.join( "Documents", "addresses", "address_records.csv" )
+    sheet.write_to_file( outfile )
 
 === Documentation is incomplete ===
 
-There are lots of other features, but they'll take time to test and document.
+There are other features, but they'll take time to test and document.
 
 
 

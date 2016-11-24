@@ -33,6 +33,10 @@ class MadTestCase < FunWith::Testing::TestCase # Test::Unit::TestCase
     set_spreadsheet_paths
   end
   
+  def load_sheet( *args )
+    @sheet = CsvMadness.load( *args )
+  end
+  
   def load_mary
     id = @simple.index_columns.first
     @mary = @simple.fetch( id, MARY_ID )

@@ -3,39 +3,46 @@ require 'helper'
 class TestSheet < MadTestCase
   context "testing getter_name()" do
     should "return proper function names" do
-      assert_equal :hello_world, CsvMadness::Sheet.getter_name( "  heLLo __ world " )
-      assert_equal :_0_hello_world, CsvMadness::Sheet.getter_name( "0  heLLo __ worlD!!! " )
+      test_data = [
+        ["  heLLo __ world ", :hello_world],
+        ["0  heLLo __ worlD!!! ", :_0_hello_world],
+        ["9ess 🐙 bsv++=", :_9ess_bsv ]
+      ]
+      
+      for input, expected in test_data
+        assert_equal expected, CsvMadness::Sheet.getter_name( input )
+      end
     end
   end
   
   context "testing default spreadsheet paths" do
-    should "only load existing paths" do
-      assert_raises(RuntimeError) do
+    should "raise error if a path does not exist" do
+      assert_raises( RuntimeError ) do
         CsvMadness::Sheet.add_search_path( CsvMadness.root.join("rocaganthor") )
       end
     end
     
     should "check a search path for files to load" do
-      sheet = CsvMadness.load( "with_nils.csv" )
-      assert sheet.is_a?(CsvMadness::Sheet)
+      load_sheet( "with_nils.csv" )
+      assert @sheet.is_a?( CsvMadness::Sheet )
     end
   end
   
   context "testing column_types" do
     should "gracefully handle empty strings for all column_types" do
-      sheet = CsvMadness.load("test_column_types.csv")
+      load_sheet("test_column_types.csv")
       
       for type, ignore_proc in CsvMadness::Sheet::COLUMN_TYPES
-        sheet.set_column_type( type, type )
+        @sheet.set_column_type( type, type )
       end
       
-      record = sheet.records[0]
+      record = @sheet.records[0]
       
       assert_kind_of String, record.date
       assert_equal nil, record.number
       assert_equal nil, record.float
       
-      record = sheet.records[1]
+      record = @sheet.records[1]
       assert_equal "12", record.id
       assert_equal 134.2, record.number
       assert_equal 100, record.integer
@@ -45,7 +52,7 @@ class TestSheet < MadTestCase
   
   context "testing add/remove records" do
     setup do
-      @sheet = CsvMadness.load( "simple.csv", :index => :id )
+      load_sheet( "simple.csv", :index => :id )
     end
     
     should "add record" do
@@ -95,17 +102,20 @@ class TestSheet < MadTestCase
     end
 
     should "deliver me a properly blanked spreadsheet (index)" do
-      sheet = CsvMadness.load( "splitter.csv", :index => [:id] )
-      blank_sheet = sheet.blanked
+      load_sheet( "splitter.csv", :index => [:id] )
+      blank_sheet = @sheet.blanked
+      
+      assert_zero blank_sheet.length
+      assert_includes blank_sheet.index_columns, :id 
     end
     
     should "split splitter" do
-      sheet = CsvMadness.load( "splitter.csv", :index => [:id, :party] )
+      load_sheet( "splitter.csv", :index => [:id, :party] )
       
-      sheets = sheet.split(&:party)
+      sheets = @sheet.split(&:party)
       
       for party in %w(D I R)
-        assert_equal_length sheets[party], sheet.records.select{|r| r.party == party }
+        assert_equal_length sheets[party], @sheet.records.select{|r| r.party == party }
       end
       
       assert_includes sheets["D"].index_columns, :id
@@ -115,8 +125,8 @@ class TestSheet < MadTestCase
   
   context "testing hilarious spreadsheet fails" do
     should "raise error on forbidden column name" do
-      assert_raises(RuntimeError) do
-        sheet = CsvMadness.load( "forbidden_column.csv" )
+      assert_raises( CsvMadness::ForbiddenColumnNameError ) do
+        CsvMadness.load( "forbidden_column.csv" )
       end
     end
   end
