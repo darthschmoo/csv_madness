@@ -4,30 +4,36 @@
 class DataAccessorModule < Module
   # mapping : keys = column symbol
   #           values = column index
+  attr_accessor :column_accessors_map
+  
   def initialize( mapping )
-    @column_accessors = []
-    remap_accessors( mapping )
+    puts "Got mapping #{mapping.inspect}"
+    @column_accessors_map = mapping
+    remap_accessors
   end
   
-  def install_column_accessors( column, index )
-    unless is_valid_ruby_method?( column )
-      column = "csv_column_#{index}"
-    end
+  def install_column_accessors( *columns )
+    for column in columns.flatten
+      unless is_valid_ruby_method?( column )
+        warn( "#{column.inspect} is not a valid ruby method" )
+        require "data_accessor_module"    # TODO:  WTF?
+        column = "csv_column_#{index}"
+        warn( "   ----> renaming to #{column.inspect}" )
+      end
     
-    @column_accessors << column
-    
-    if self.respond_to?( column )
-      puts "Column already has accessors"
-    else
-      eval <<-EOF
-          self.send( :define_method, :#{column} ) do
-            self.csv_data[#{index}]
-          end
+      if self.respond_to?( column )
+        puts "Column already has accessors"
+      else
+        eval <<-EOF
+            self.send( :define_method, :#{column} ) do
+              self.csv_data[ self.column_accessors_map[ :#{column} ] ]
+            end
       
-          self.send( :define_method, :#{column}= ) do |val|
-            self.csv_data[#{index}] = val
-          end
-      EOF
+            self.send( :define_method, :#{column}= ) do |val|
+              self.csv_data[ self.column_accessors_map[ :#{column} ] ] = val
+            end
+        EOF
+      end
     end
   end
   
@@ -35,24 +41,31 @@ class DataAccessorModule < Module
   # a titch slower to look up?  But a change to the mapping automatically updates the method
   def remove_column_accessors( *columns )
     for column in columns.flatten
-      self.send( :remove_method, column )
-      self.send( :remove_method, :"#{column}=" )
+      for method_sym in [column, :"#{column}="]
+        self.send( :remove_method, method_sym ) if self.respond_to?( method_sym )
+      end
     end
   end
   
   def remove_all_column_accessors
     # 2016-11-24 : was this necessary for anything
     # @column_accessors ||= []
-    remove_column_accessors( @column_accessors )
-    @column_accessors = []    
+    remove_column_accessors( @column_accessors_map.keys )
   end
   
-  def remap_accessors( mapping )
+  # Partly obsoleted.  
+  def remap_accessors( *args )
+    # 
+    
+    
     remove_all_column_accessors
     
-    for column, index in mapping
-      install_column_accessors( column, index )
+    if args.length == 1
+      debugger
+      @column_accessors_map = args.first
     end
+    
+    install_column_accessors( @column_accessors_map.keys )
   end
   
   # Symbol.inspect doesn't output " quotes when given a sym 

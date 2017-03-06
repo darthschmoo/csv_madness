@@ -8,8 +8,10 @@ module CsvMadness
   # symbol.
   class Record
     attr_accessor :csv_data
+    attr_reader   :column_accessors_map
     
-    def initialize( data )
+    def initialize( data, mapping )
+      @column_accessors_map = mapping            # holds a reference to its spreadsheet's overall mapping
       import_record_data( data )
     end
     

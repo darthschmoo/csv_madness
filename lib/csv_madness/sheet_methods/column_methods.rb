@@ -91,7 +91,9 @@ module CsvMadness
         end
       end
     
-      # If no block given, adds an empty column
+      # If no block given, adds an empty column.
+      # If block given, fills the new column cells when the block is run on each record
+      # TODO: Should be able to specify the index of the column
       def add_column( column, &block )
         raise_on_forbidden_column_names( column )
         raise ColumnExistsError.new( "Column already exists: #{column}" ) if @columns.include?( column )

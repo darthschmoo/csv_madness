@@ -65,6 +65,7 @@ class MadTestCase < FunWith::Testing::TestCase # Test::Unit::TestCase
   end
   
   def muck_up_spreadsheet
+    debugger
     @simple.add_column(:scrambled_name) do |val, record|
       record.fname.chars.map(&:to_s).zip( record.lname.chars.map(&:to_s) ).flatten.compact.join
     end

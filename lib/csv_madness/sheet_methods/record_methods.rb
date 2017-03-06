@@ -23,7 +23,7 @@ module CsvMadness
           record = record.csv_data
         end
       
-        record = @record_class.new( record )
+        record = @record_class.new( record, self.column_accessors_map )
         @records << record
         add_to_indexes( record )
       end

@@ -4,6 +4,7 @@ class TestBuilder < MadTestCase
   context "testing simple cases" do
     should "spreadsheetize integers" do
       integers = [65, 66, 67, 68, 69, 70]
+      
       sb = CsvMadness::Builder.new do |s|
         s.column( :even, "even?" )          # calls the .even?() method on each object
         s.column( :odd, "odd?" )
@@ -15,7 +16,7 @@ class TestBuilder < MadTestCase
           i * i
         end
       end
-      # 
+      
       ss = sb.build( integers )
       
       for record in ss.records

@@ -217,7 +217,6 @@ class TestCsvMadness < MadTestCase
       end
       
       should "write to an output file properly" do
-        # debugger
         @outfile = @csv_output_path.join("output_nilfile.csv")
         @nilsheet.write_to_file( @outfile, force_quotes: true )
         

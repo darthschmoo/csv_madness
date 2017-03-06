@@ -12,7 +12,8 @@ class TestCsvMadness < MadTestCase
       assert @mary.respond_to?(:lname)
       assert @darwin.respond_to?(:fname)
       assert @mary.born.is_a?(String)
-
+      
+      debugger
       muck_up_spreadsheet
       set_person_records
       

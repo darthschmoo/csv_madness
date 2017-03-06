@@ -8,7 +8,7 @@ module CsvMadness
     include SheetMethods::RecordMethods
     
     
-    attr_reader :columns, :index_columns, :records, :record_class, :opts
+    attr_reader :columns, :index_columns, :record_class, :opts
     attr_accessor :spreadsheet_file
     
     # opts: 
@@ -62,6 +62,10 @@ module CsvMadness
 
     def [] offset
       @records[offset]
+    end
+    
+    def records
+      @records ||= []
     end
   
     
@@ -215,7 +219,7 @@ module CsvMadness
     def package
       @records = []
       (@csv || []).each do |row|
-        @records << @record_class.new( row )
+        @records << @record_class.new( row, self.column_accessors_map )
       end
     end
   
@@ -224,6 +228,8 @@ module CsvMadness
       fetch_csv_headers.length
     end
     
+    # returns a mapping based off the current ordered list of columns.
+    # A hash where the first column
     def columns_to_mapping
       @columns.each_with_index.inject({}){ |memo, item| 
         memo[item.first] = item.last
@@ -238,7 +244,12 @@ module CsvMadness
     end
     
     def update_data_accessor_module
+      debugger
       @module.remap_accessors( columns_to_mapping )
+    end
+    
+    def column_accessors_map
+      @module.column_accessors_map
     end
   end
 end
