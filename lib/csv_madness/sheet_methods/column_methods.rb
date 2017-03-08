@@ -1,7 +1,6 @@
 module CsvMadness
   module SheetMethods
     module ColumnMethods
-    
       COLUMN_TYPES = {
         number: Proc.new do |cell, record|
           rval = cell
@@ -60,8 +59,12 @@ module CsvMadness
       FORBIDDEN_COLUMN_NAMES = [:to_s]  # breaks things hard when you use them.  Probably not comprehensive, sadly.
       
       
-      def column col
-        @records.map(&col)
+      # can only be called with proper column names (not extra methods)
+      def column( col )
+        index = index_of_column( col )
+      
+        # Should be faster...
+        @records.map(&:data).map{ |dat| dat[index] }
       end
     
       def has_column?( col )
@@ -71,69 +74,71 @@ module CsvMadness
       # retrieve multiple columns.  Returns an array of the form
       # [ [record1:col1, record1:col2...], [record2:col1, record2:col2...] [...] ]
       def multiple_columns(*args)
-        @records.inject([]){ |memo, record|
-          memo << args.map{ |arg| record.send(arg) }
-          memo
-        }
+        column_results = args.map do |col| 
+          index_of_column( col ) 
+        end
+        
+        column_results.first.zip( *(column_results[1..-1] ) )
       end
       
-      def alter_column( column, blank = :undefined, &block )
-        raise_on_missing_columns( column )
-      
-        if cindex = @columns.index( column )
-          for record in @records
-            if record.blank?(column) && blank != :undefined
-              record[cindex] = blank
-            else
-              record[cindex] = yield( record[cindex], record )
-            end
+      def alter_column( col, blank = :undefined, &block )
+        cindex = index_of_column( col )
+
+        for record in @records
+          if record.blank?( col ) && blank != :undefined
+            record[cindex] = blank
+          else
+            record[cindex] = yield( record[cindex], record )
           end
         end
       end
     
-      # If no block given, adds an empty column.
+      # If no block given, adds an empty column (blank string).
       # If block given, fills the new column cells when the block is run on each record
       # TODO: Should be able to specify the index of the column
-      def add_column( column, &block )
-        raise_on_forbidden_column_names( column )
-        raise ColumnExistsError.new( "Column already exists: #{column}" ) if @columns.include?( column )
+      def add_column( col, &block )
+        raise_on_forbidden_column_names( col )
+        raise_on_columns_present( col )
 
-        @columns << column
+        @columns << col
       
         # add empty column to each row
-        @records.map{ |r|
-          r.csv_data << {column => ""} 
-        }
+        @records.map{ |r| r.data << "" }
+        
+        set_column_mapping
+        alter_column( col, &block ) if block_given?
+      end
+    
       
-        update_data_accessor_module
+      def drop_column( col )
+        index = index_of_column( col )
+        @columns.delete( col.to_sym )
       
-        if block_given?
-          alter_column( column ) do |val, record|
-            yield val, record
-          end
+        @records.map(&:data).map do |dat|
+          dat.delete_at( index )
         end
+      
+        remove_column_from_mapping( col )
       end
     
-      def drop_column( column )
-        raise_on_missing_columns( column )
-      
-        @columns.delete( column )
-      
-        key = column.to_s
-      
-        @records.map{ |r|
-          r.csv_data.delete( key )
-        }
-      
-        update_data_accessor_module
+      def rename_column( old_column_name, new_name )
+        raise_on_missing_columns( old_column_name )
+        raise_on_forbidden_column_names( new_name )
+        
+        # - rename the column itself
+        # - rename the column in the index
+        # - rename the column in the column mapping
+        column_index = index_of_column( old_column_name )
+        
+        @columns[column_index] = new_name
+        
+        if indexing_enabled? && has_index_column?( old_column_name )
+          rename_index_column( column, new_name )
+        end
+        
+        rename_column_mapping_key( old_column_name, new_name )
       end
-    
-      def rename_column( column, new_name )
-        @columns[@columns.index(column)] = new_name
-        rename_index_column( column, new_name ) if @index_columns.include?( column )
-        update_data_accessor_module
-      end
-    
+      
       def set_column_type( column, type, blank = :undefined )
         alter_column( column, blank, &COLUMN_TYPES[type] )
       end
@@ -167,11 +172,41 @@ module CsvMadness
     
       alias :concatenate :concat_columns
       
+      def index_of_column( col )
+        case col
+        when Integer
+          col
+        when Symbol, String
+          raise_on_missing_columns( col )
+          @column_mapping[ col.to_sym ]
+        end
+      end
+      
       protected
+      def rename_column_mapping_key( old_column_name, new_name )
+        @column_mapping[new_name] = @column_mapping.delete( old_column_name )
+      end
+      
+      def remove_column_from_mapping( col )
+        index = @column_mapping.delete( col.to_sym )
+        
+        @column_mapping.each do |_col, i|
+          @column_mapping[_col] = i - 1  if i > index
+        end
+      end
+      
+      
+      
       def raise_on_missing_columns( *cols )
         missing_columns = cols.flatten.reject{ |col| self.has_column?( col ) }
       
-        raise MissingColumnError.new( "#{caller[0]}: required_column(s) :#{missing_columns.inspect} not found." ) unless missing_columns.fwf_blank?
+        raise MissingColumnError.new( "#{caller[0]}: requested column(s) :#{missing_columns.inspect} not found." ) unless missing_columns.fwf_blank?
+      end
+      
+      def raise_on_columns_present( *cols )
+        present_columns = cols.flatten.select{ |col| self.has_column?( col ) }
+        
+        raise ColumnExistsError.new( "#{caller[0]}: requested column(s) already present: #{present_columns.inspect}" ) unless present_columns.fwf_blank?
       end
     
       def forbidden_column_name?( col )

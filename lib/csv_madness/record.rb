@@ -7,48 +7,54 @@ module CsvMadness
   # future.  I'd like to be able to address by row and by
   # symbol.
   class Record
-    attr_accessor :csv_data
-    attr_reader   :column_accessors_map
+    include RecordMethods::MethodMethods
     
-    def initialize( data, mapping )
-      @column_accessors_map = mapping            # holds a reference to its spreadsheet's overall mapping
-      import_record_data( data )
+    attr_accessor :data
+    attr_reader   :spreadsheet
+    
+    def initialize( _data, sheet ) # , mapping )
+      @spreadsheet = sheet
+      import_record_data( _data )
     end
+    
+    # Experimental approach to getter/setter methods.  Seems easier than
+    # constantly rewriting an accessor module every time the columns get 
+    # manipulated.
+    #
+    # Should raise a method_missing if the get/set method isn't in
+    # the index mapping.
+    def method_missing( method, *args )
+      self.spreadsheet.call_record_method( self, method, args )
+    end
+    
     
     def [] key
-      case key
-      when String, Integer
-        @csv_data[key] 
-      when Symbol
-        @csv_data[key.to_s]
-      end
+      self.spreadsheet.get_cell( self, key )
     end
     
+    
     def []= key, val
-      case key
-      when String, Integer
-        @csv_data[key] = val
-      when Symbol
-        @csv_data[key.to_s] = val
-      end
+      self.spreadsheet.set_cell( self, key, val )
+      # case key
+      # when String, Integer
+      #   @csv_data[key] = val
+      # when Symbol
+      #   @csv_data[key.to_s] = val
+      # end
     end
     
     def columns
-      self.class.spreadsheet.columns
-    end
-    
-    def self.columns
       self.spreadsheet.columns
     end
     
-    def self.spreadsheet= sheet
-      @spreadsheet = sheet
-    end
-    
-    def self.spreadsheet
-      @spreadsheet
-    end
-    
+    # def self.spreadsheet= sheet
+    #   @spreadsheet = sheet
+    # end
+    #
+    # def self.spreadsheet
+    #   @spreadsheet
+    # end
+    #
     def to_csv( opts = {} )
       self.columns.map{|col| self.send(col) }.to_csv( opts )
     end
@@ -58,35 +64,41 @@ module CsvMadness
     end
     
     def to_a
-      self.to_hash.to_a
+      self.data
     end
     
     def blank?( col )
       (self.send( col.to_sym ).to_s || "").strip.length == 0
     end
     
+    def inspect
+      cols = self.spreadsheet.columns
+      cols.zip( self.data ).inspect
+    end
+    
+    
+    
     protected
-    def import_record_data( data )
-      case data
+    def import_record_data( _data )
+      case _data
       when Array
-        csv_data = CSV::Row.new( self.columns, data )
+        self.data = _data
       when Hash
         fields = self.columns.map do |col|
-          data[col]
+          _data[col]
         end
         # for col in self.columns
         #   fields << data[col]
         # end
         
-        csv_data = CSV::Row.new( self.columns, fields )
+        self.data = fields # CSV::Row.new( self.columns, fields )
       when CSV::Row
-        csv_data = data
+        self.data = _data.to_a.map(&:last)
+      when Record
+        self.data = _data.data.clone
       else
-        raise "record.import_record_data() doesn't take objects of type #{data.inspect}" unless data.respond_to?(:csv_data)
-        csv_data = data.csv_data.clone
+        raise "Don't know how to handle this input"
       end
-      
-      @csv_data = csv_data
     end
   end
 end

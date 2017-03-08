@@ -5,7 +5,9 @@ module CsvMadness
       # " hello;: world! " => :hello_world
       def getter_name( name )
         # replace any run of non-word characters with a single "_"
-        name = name.downcase.gsub( /(\W|_|\s)+/, "_" )
+        return nil if name.nil?
+        
+        name = name.downcase.to_s.gsub( /(\W|_|\s)+/, "_" )
       
         # snip trailing and leading "_"
         name = name.gsub( /(^_+|_+$)/, "" )
@@ -14,6 +16,10 @@ module CsvMadness
         name = "_#{name}" if name.match( /^\d/ )
       
         name.to_sym
+      end
+      
+      def default_column_name( index )
+        "col#{index}".to_sym
       end
     
     
@@ -28,9 +34,7 @@ module CsvMadness
         @search_paths << path unless @search_paths.include?( path )
       end
     
-      def search_paths
-        @search_paths
-      end
+      attr_reader :search_paths
     
       def from( csv_file, opts = {} )
         if f = find_spreadsheet_in_filesystem( csv_file )

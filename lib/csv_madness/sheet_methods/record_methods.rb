@@ -1,64 +1,98 @@
 module CsvMadness
   module SheetMethods
     module RecordMethods
-      def add_record( record )
+      def add_record( record, &block )
         case record
         when Array
-          # CSV::Row.new( column names, column_entries ) (in same order as columns, natch) 
-          record = CSV::Row.new( self.columns, record )
-        when Hash
-          header = []
-          fields = []
-        
-          for col in self.columns
-            header << col
-            fields << record[col]
-          end
-        
-          record = CSV::Row.new( header, fields )
-        when CSV::Row
           # do nothing
+        when Hash
+          record = @column_mapping.inject( [] ) do |memo, col_and_index|
+            col, index = col_and_index
+            
+            if record.has_key?( col )
+              val = record[col]
+            elsif record.has_key?( col.to_s )
+              val = record[col.to_s]
+            else
+              val = nil
+            end
+
+            if index >= memo.length
+              memo.insert( index, val )
+            else
+              memo[index] = val
+            end
+            
+            memo
+          end
+        when CSV::Row
+          record = record.to_a.map( &:last )
+        when CsvMadness::Record
+          # TODO: But what if the two records aren't from the same kinds of sheet
+          # IOW, different columns or columns in different orders, etc.
+          record = record.data
         else
           raise "sheet.add_record() doesn't take objects of type #{record.inspect}" unless record.respond_to?(:csv_data)
           record = record.csv_data
         end
-      
-        record = @record_class.new( record, self.column_accessors_map )
+        
+        record = Record.new( record, self )
+        
         @records << record
-        add_to_indexes( record )
+        index_records( record ) if indexing_enabled?
+        
+        record
       end
     
       alias :<< :add_record
       
       def add_blank_record( &block )
-        self.add_record( {} )
-        if block_given?
-          yield self.records.last
-        else
-          self.records.last
-        end
+        self.add_record( [], &block )
+        #
+        # if block_given?
+        #   yield self.records.last
+        # else
+        #   self.records.last
+        # end
       end
     
       # record can be the row number (integer from 0...@records.length)
-      # record can be the record itself (anonymous class)
+      # record can be the record itself
+      #
+      # returns the record that was removed.  
       def remove_record( record )
-        record = @records[record] if record.is_a?(Integer)
-        return if record.nil?
+        if record.is_a?(Integer)
+          record = remove_record_at_index( record )
+        else
+          record = self.records.delete( record )
+        end
+        
+        self.unindex_record( record ) if indexing_enabled?
+        record
+      end
       
-        self.remove_from_index( record )
-        @records.delete( record )
+      def remove_record_at_index( index )
+        self.records.delete_at( index )
       end
     
-      # Here's the deal: you hand us a block, and we'll remove the records for which
-      # it yields _true_.
+      # Here's the deal: you hand it an array of records (or indexes, or a mix of the two),
+      # and it will remove the records (or the index... may want to test the indexing thing).
+      # If you give it a block, and it'll remove all the records for which
+      # the block yields _true_.
+      #
+      # returns an array of the removed records, in case you want them for anything.
       def remove_records( records = nil, &block )
-        if block_given?
-          for record in @records
-            remove_record( record ) if yield( record ) == true
-          end
-        else # records should be an array
-          for record in records
-            self.remove_record( record )
+        [].tap do |removed|
+          if block_given?
+            for record in @records
+              removed << self.remove_record( record ) if yield( record ) == true
+            end
+          else # records should be an array
+            records = records.map{ |r| r.is_a?( Integer ) ? self[r] : r }   # turn indexes into records
+            
+            for record in records
+              removed << self.remove_record( record )
+            end
           end
         end
       end
@@ -68,10 +102,19 @@ module CsvMadness
       # same order that the keying objects appear.
       # Index column should yield a different, unique value for each record.
       def fetch( index_col, key )
-        if key.is_a?(Array)
-          key.map{ |k| @indexes[index_col][k] }
+        if indexing_enabled?
+          if key.is_a?(Array)
+            key.map{ |k| @indexes[index_col][k] }
+          else
+            @indexes[index_col][key]
+          end
         else
-          @indexes[index_col][key]
+          if key.is_a?(Array)
+            key.map{ |k| self.fetch( index_col, k ) }
+          else
+            index = index_of_column( index_col )
+            @records.detect{ |r| r.data[index] == key }
+          end
         end
       end
     
@@ -91,8 +134,25 @@ module CsvMadness
       # TODO!  Should be returning self rather than the records.a
       def filter!( &block )
         @records = self.filter( &block )
-        reindex
+        reindex if indexing_enabled?
         @records
+      end
+      
+      def extra_method?( m )
+        @extra_methods.keys.include?( m )
+      end
+      
+      # The method given should take a record, return... well, anything.
+      def add_extra_method( method, &block )
+        @extra_methods[method.to_sym] = block
+      end
+      
+      def remove_extra_method( method )
+        @extra_methods.delete( method.to_sym )
+      end
+      
+      def call_extra_method( method, record )
+        @extra_methods[method.to_sym].call( record )
       end
     end
   end

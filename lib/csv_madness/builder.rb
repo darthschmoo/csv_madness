@@ -66,7 +66,7 @@ module CsvMadness
     protected
     def build_cell_by_pathstring( object, str, opts )
       handle_cell_build_error( :build_cell_by_pathstring, opts ) do
-        for method in str.split(".").map(&:to_sym)
+        for method in str.split(".")
           object = object.send(method)
         end
 

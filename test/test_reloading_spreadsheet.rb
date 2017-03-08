@@ -13,9 +13,11 @@ class TestCsvMadness < MadTestCase
       assert @darwin.respond_to?(:fname)
       assert @mary.born.is_a?(String)
       
-      debugger
       muck_up_spreadsheet
-      set_person_records
+      # set_person_records
+      
+      assert_kind_of CsvMadness::Record, @mary
+      assert_kind_of CsvMadness::Record, @darwin
       
       assert !@mary.respond_to?(:lname)
       assert !@darwin.respond_to?(:fname)

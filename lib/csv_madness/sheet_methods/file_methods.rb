@@ -29,12 +29,13 @@ module CsvMadness
     
       def reload_spreadsheet( opts = @opts )
         load_csv if @spreadsheet_file
-        set_initial_columns( opts[:columns] )
-        create_record_class
-        package
+        set_columns( opts[:columns] )
+        package_each_csv_row
       
-        set_index_columns( opts[:index] )
-        reindex
+        if indexing_enabled?
+          set_index_columns( opts[:index] )
+          reindex
+        end
       end
     end
   end

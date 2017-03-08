@@ -38,22 +38,22 @@ class MadTestCase < FunWith::Testing::TestCase # Test::Unit::TestCase
   end
   
   def load_mary
-    id = @simple.index_columns.first
+    id = @simple.columns.first
     @mary = @simple.fetch( id, MARY_ID )
   end
   
   def load_bill
-    id = @simple.index_columns.first
+    id = @simple.columns.first
     @bill = @simple.fetch( id, BILL_ID )
   end
   
   def load_darwin
-    id = @simple.index_columns.first
+    id = @simple.columns.first
     @darwin = @simple.fetch( id, DARWIN_ID )
   end
   
   def load_chuck
-    id = @simple.index_columns.first
+    id = @simple.columns.first
     @chuck = @simple.fetch( id, CHUCK_ID )
   end
      
@@ -65,7 +65,6 @@ class MadTestCase < FunWith::Testing::TestCase # Test::Unit::TestCase
   end
   
   def muck_up_spreadsheet
-    debugger
     @simple.add_column(:scrambled_name) do |val, record|
       record.fname.chars.map(&:to_s).zip( record.lname.chars.map(&:to_s) ).flatten.compact.join
     end

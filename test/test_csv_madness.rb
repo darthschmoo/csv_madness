@@ -55,9 +55,9 @@ class TestCsvMadness < MadTestCase
             cell = "*#{cell}*"
           end
         
-          bill = @simple.fetch(:id, "2")
-          mary = @simple.fetch(:id, "1")
-        
+          bill = @simple.fetch(:id, "*2*")
+          mary = @simple.fetch(:id, "*1*")
+          
           assert_equal "*Bill*", bill.fname
           assert_equal "*Moore*", mary.lname
           assert_equal "*1*", mary.id
@@ -114,17 +114,15 @@ class TestCsvMadness < MadTestCase
         end
       
         should "successfully decorate record objects with new functionality" do
-          moduul = Module.new do
-            def full_name
-              "#{self.fname} #{self.lname}"
-            end
-          
-            def name_last_first
-              "#{self.lname}, #{self.fname}"
-            end
+
+
+          @simple.add_extra_method( :full_name ) do |record|
+            "#{record.fname} #{record.lname}"
           end
-        
-          @simple.add_record_methods( moduul )
+          
+          @simple.add_extra_method( :name_last_first ) do |record|
+            "#{record.lname}, #{record.fname}"
+          end
         
           assert @simple[0].respond_to?( :full_name )
           assert_equal "Mary Moore", @simple[0].full_name
@@ -133,10 +131,8 @@ class TestCsvMadness < MadTestCase
         end
       
         should "add methods to record objects (block form)" do
-          @simple.add_record_methods do
-            def full_name
-              "#{self.fname} #{self.lname}"
-            end
+          @simple.add_extra_method( :full_name ) do |record|
+             "#{record.fname} #{record.lname}"
           end
         
           assert @simple[0].respond_to?( :full_name )
@@ -145,6 +141,7 @@ class TestCsvMadness < MadTestCase
       
         should "return an array of objects when feeding fetch() an array" do
           records = @simple.fetch(:id, ["1","2"])
+
           assert_equal records.length, records.compact.length
           assert_equal 2, records.length
           assert_equal "1", records.first.id
@@ -202,7 +199,7 @@ class TestCsvMadness < MadTestCase
       
       should "stomp away the nils" do
         @norris = @nilsheet.fetch(:id, "4")
-        assert_equal nil, @norris.born
+        assert_nil @norris.born
         assert_equal "Chuck", @norris.fname
       
         @nilsheet.nils_are_blank_strings  # should turn every nil into a ''
@@ -244,6 +241,7 @@ class TestCsvMadness < MadTestCase
         
         should "drop column" do
           load_mary
+          
           assert @mary.respond_to?(:lname)
           assert_equal "Moore", @mary.lname
           
