@@ -1,10 +1,11 @@
 # encoding: utf-8
 require 'fun_with_gems'
 require_relative File.join( "lib", "csv_madness" )
+self.extend( FunWith::Gems::Rakefile)
 
-FunWith::Gems::Rakefile.setup CsvMadness, self
+rakefile_setup CsvMadness
 
-FunWith::Gems::Rakefile.specification do |gem|
+gem_specification do |gem|
     # gem is a Gem::Specification... see http://docs.rubygems.org/read/chapter/20 for more options
     # dependencies defined in Gemfile
       gem.name = "csv_madness"
@@ -22,7 +23,7 @@ FunWith::Gems::Rakefile.specification do |gem|
                   # csv_madness.gemspec )
 end
 
-FunWith::Gems::Rakefile.setup_gem_boilerplate
+setup_gem_boilerplate
 
 #
 #
