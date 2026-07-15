@@ -49,3 +49,6 @@ pkg
 #*.rbc
 
 Gemfile.lock
+BUGS.txt
+IDEAS.txt
+csv_madness.gemspec.bak

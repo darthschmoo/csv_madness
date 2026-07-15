@@ -15,4 +15,5 @@ group :development do
   # gem "debugger"
 end
 
+gem "csv"
 gem 'fun_with_gems', '~> 0.0', ">= 0.0.2"
