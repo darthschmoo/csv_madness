@@ -16,4 +16,4 @@ group :development do
 end
 
 gem "csv"
-gem 'fun_with_gems', '~> 0.0', ">= 0.0.2"
+gem 'fun_with_gems', '~> 0.0', ">= 0.0.7"
