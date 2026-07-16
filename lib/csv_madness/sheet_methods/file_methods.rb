@@ -1,8 +1,8 @@
 module CsvMadness
   module SheetMethods
     module FileMethods
-      def write_to_file( file, opts = {} )
-        self.class.write_to_file( self, file, opts )
+      def write_to_file( file )
+        self.class.write_to_file( self, file )
       end
     
       # pass an arbitrary filepath to save sheet to that filepath
@@ -20,7 +20,7 @@ module CsvMadness
         end
       
         if file
-          self.write_to_file( file, @opts || {} )
+          self.write_to_file( file )
         else
           raise "CsvMadness.save(:timestamp) - Spreadsheet must be specified by spreadsheet_file"
         end

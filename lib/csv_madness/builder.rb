@@ -39,7 +39,7 @@ module CsvMadness
         STDOUT << "."
         record = {}
         for sym in @column_syms
-          record[sym] = build_cell( object, sym, build_opts )
+          record[sym] = build_cell( object, sym, build_opts: build_opts )
         end
 
         spreadsheet.add_record( record )  # hash form
