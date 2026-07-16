@@ -62,15 +62,15 @@ module CsvMadness
     
       # opts are passed to underlying CSV (:row_sep, :encoding, :force_quotes)
       def to_csv( spreadsheet, opts = {} )
-        out = spreadsheet.columns.to_csv( opts )
+        out = spreadsheet.columns.to_csv
         spreadsheet.records.inject( out ) do |output, record|
-          output << record.to_csv( opts )
+          output << record.to_csv
         end
       end
     
-      def write_to_file( spreadsheet, file, opts = {} )
+      def write_to_file( spreadsheet, file )
         file = file.fwf_filepath.expand_path
-        file.write( spreadsheet.to_csv( opts ) )
+        file.write( spreadsheet.to_csv )
       end
     end
   end

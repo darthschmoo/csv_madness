@@ -54,9 +54,9 @@ module CsvMadness
     
     
 
-    def to_csv( opts = {} )
-      self.records.inject( self.columns.to_csv( opts ) ) do |output, record|
-        output << record.to_csv( opts )
+    def to_csv
+      self.records.inject( self.columns.to_csv ) do |output, record|
+        output << record.to_csv
       end
     end
 
@@ -143,11 +143,10 @@ module CsvMadness
     attr_writer :columns, :index_columns, :records, :record_class, :opts    
     
     def load_csv
-      
       # encoding seems to solve a specific problem with a specific spreadsheet, at an unknown cost.
       @csv = CSV.new( File.read(@spreadsheet_file).force_encoding("ISO-8859-1").encode("UTF-8"), 
-                        { write_headers: true, 
-                          headers: ( @opts[:header] ? :first_row : false ) } )
+                      write_headers: true, 
+                      headers: ( @opts[:header] ? :first_row : false ))
     end
     
     # Each spreadsheet has its own anonymous record class, and each CSV row instantiates

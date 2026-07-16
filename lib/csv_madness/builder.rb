@@ -24,20 +24,22 @@ module CsvMadness
                       end
     end
 
+    # verbose: true - reports errors to stdout as they're encountered
+    #
     # Three :on_error values:
     #    :print  => Put an error message in the cell instead of a value
     #    :raise  => Raise the error, halting the process
     #    :ignore => Hand back an empty cell
     # 
     # Although ideally it should be configurable by column...   
-    def build( objects, opts = { :on_error => :print } )
+    def build( objects, build_opts: { :on_error => :print, :verbose => false } )
       spreadsheet = CsvMadness::Sheet.new( @column_syms )
 
       for object in objects
         STDOUT << "."
         record = {}
         for sym in @column_syms
-          record[sym] = build_cell( object, sym, opts )
+          record[sym] = build_cell( object, sym, build_opts )
         end
 
         spreadsheet.add_record( record )  # hash form
@@ -46,14 +48,14 @@ module CsvMadness
       spreadsheet
     end
 
-    def build_cell( object, sym, opts = { :on_error => :print } )
+    def build_cell( object, sym, build_opts: { :on_error => :print } )
       column = @columns[sym]
 
       case column
       when String
-        build_cell_by_pathstring( object, column, opts )
+        build_cell_by_pathstring( object, column, build_opts )
       when Proc
-        build_cell_by_proc( object, column, opts )
+        build_cell_by_proc( object, column, build_opts )
       else
         "no idea what to do"
       end
@@ -64,8 +66,8 @@ module CsvMadness
     end
 
     protected
-    def build_cell_by_pathstring( object, str, opts )
-      handle_cell_build_error( :build_cell_by_pathstring, opts ) do
+    def build_cell_by_pathstring( object, str, build_opts )
+      handle_cell_build_error( :build_cell_by_pathstring, build_opts ) do
         for method in str.split(".").map(&:to_sym)
           object = object.send(method)
         end
@@ -74,23 +76,23 @@ module CsvMadness
       end
     end
 
-    def build_cell_by_proc( object, proc, opts )
-      handle_cell_build_error( :build_cell_by_proc, opts ) do
+    def build_cell_by_proc( object, proc, build_opts )
+      handle_cell_build_error( :build_cell_by_proc, build_opts ) do
         proc.call(object)
       end
     end
     
-    def handle_cell_build_error( caller, opts, &block )
+    def handle_cell_build_error( caller, build_opts, &block )
       begin
         yield
       end
     rescue Exception => e
-      case opts[:on_error]
+      case build_opts[:on_error]
       when nil, :print
-        puts "error #{e.message} #{caller}" if opts[:verbose]
+        puts "error #{e.message} #{caller}" if build_opts[:verbose]
         "ERROR: #{e.message} (#{caller}())"
       when :raise
-        puts "Re-raisinge error #{e.message}.  Set opts[:on_error] to :print or :ignore if you want Builder to continue on errors."
+        puts "Re-raisinge error #{e.message}.  Set build_opts[:on_error] to :print or :ignore if you want Builder to continue on errors."
         raise e
       when :ignore
         ""

@@ -20,7 +20,7 @@ module CsvMadness
         end
       
         if file
-          self.write_to_file( self.spreadsheet_file, @opts || {} )
+          self.write_to_file( file, @opts || {} )
         else
           raise "CsvMadness.save(:timestamp) - Spreadsheet must be specified by spreadsheet_file"
         end

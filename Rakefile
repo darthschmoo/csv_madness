@@ -1,7 +1,7 @@
 # encoding: utf-8
 require 'fun_with_gems'
 require_relative File.join( "lib", "csv_madness" )
-self.extend( FunWith::Gems::Rakefile)
+extend FunWith::Gems::Rakefile
 
 rakefile_setup CsvMadness
 

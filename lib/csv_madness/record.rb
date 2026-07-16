@@ -50,7 +50,7 @@ module CsvMadness
     end
     
     def to_csv( opts = {} )
-      self.columns.map{|col| self.send(col) }.to_csv( opts )
+      self.columns.map{|col| self.send(col) }.to_csv( **opts )
     end
     
     def to_hash

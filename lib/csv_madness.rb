@@ -1,4 +1,5 @@
 require 'csv'
+require 'debug'
 require 'fun_with_gems'
 # require 'fun_with_version_strings'
 require 'time'        # to use Time.parse to parse cells to get the date
